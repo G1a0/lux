@@ -5,7 +5,10 @@ import type { ChampSelectSession, LCUEventMessage } from '@/lib/lcu'
 import { opggApi, type OpggCounterStats, type OpggSynergyStats, type OpggChampionTier } from '@/lib/opgg-api'
 import { scoreAllChampions, type ChampionScore, type GameState } from '@/lib/scorer'
 import { debounce } from '@/lib/utils'
-import championMetaData from '@/data/champion-meta.json'
+import type { ChampionMeta } from '@/types/champion'
+import championMetaRaw from '@/data/champion-meta.json'
+
+const championMetaData = championMetaRaw as unknown as ChampionMeta
 
 const OPGG_TIMEOUT_MS = 3000
 

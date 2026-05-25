@@ -1,15 +1,8 @@
-type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 interface LoggerOptions {
   name: string
   version: string
-}
-
-const LOG_LEVELS: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
 }
 
 function formatMessage(level: LogLevel, name: string, message: string): string {

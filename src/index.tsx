@@ -93,11 +93,9 @@ export function load() {
 
   startRecommendation()
 
-  let currentPosition = ''
-
-  setOnScoresUpdated((scores, useOpgg) => {
+  setOnScoresUpdated((scores, useOpgg, position) => {
     updateInjections(scores, useOpgg)
-    updatePanelRender(scores, useOpgg, currentPosition, scores.length > 0)
+    updatePanelRender(scores, useOpgg, position, scores.length > 0)
   })
 
   setOnClearRecommendation(() => {

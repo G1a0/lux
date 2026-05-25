@@ -10,8 +10,6 @@ import championMetaRaw from '@/data/champion-meta.json'
 
 const championMetaData = championMetaRaw as unknown as ChampionMeta
 
-const OPGG_TIMEOUT_MS = 3000
-
 interface RecommendationCache {
   sessionId: string
   scores: ChampionScore[]
@@ -23,10 +21,10 @@ let cache: RecommendationCache | null = null
 let unsubSession: (() => void) | null = null
 let unsubPhase: (() => void) | null = null
 
-let onScoresUpdated: ((scores: ChampionScore[], useOpgg: boolean) => void) | null = null
+let onScoresUpdated: ((scores: ChampionScore[], useOpgg: boolean, position: string) => void) | null = null
 let onClearRecommendation: (() => void) | null = null
 
-export function setOnScoresUpdated(cb: (scores: ChampionScore[], useOpgg: boolean) => void) {
+export function setOnScoresUpdated(cb: (scores: ChampionScore[], useOpgg: boolean, position: string) => void) {
   onScoresUpdated = cb
 }
 
@@ -67,25 +65,24 @@ async function fetchOpggData(championIds: number[], position: string): Promise<{
   useOpgg: boolean
 }> {
   try {
-    const [tierList, ...champResults] = await Promise.all([
-      withTimeout(opggApi.getTierList(), OPGG_TIMEOUT_MS),
-      ...championIds.slice(0, 15).map(id =>
-        withTimeout(
-          Promise.all([
-            opggApi.getCounters(id, position),
-            opggApi.getSynergies(id, position),
-          ]),
-          OPGG_TIMEOUT_MS,
-        ),
-      ),
-    ])
+    const tierList = await opggApi.getTierList()
 
     const counters = new Map<number, OpggCounterStats[]>()
     const synergies = new Map<number, OpggSynergyStats[]>()
-    champResults.forEach(([c, s], i) => {
-      counters.set(championIds[i], c)
-      synergies.set(championIds[i], s)
-    })
+
+    // Fetch per-champion data concurrently; individual failures return empty arrays
+    const champResults = await Promise.all(
+      championIds.slice(0, 15).map(async id => {
+        const [c, s] = await Promise.all([
+          opggApi.getCounters(id, position),
+          opggApi.getSynergies(id, position),
+        ])
+        counters.set(id, c)
+        synergies.set(id, s)
+      }),
+    )
+    // Suppress unused — Promise.all is for concurrency, results stored in maps
+    void champResults
 
     const tierMap = new Map<number, OpggChampionTier>()
     tierList.forEach(t => tierMap.set(t.championId, t))
@@ -96,20 +93,9 @@ async function fetchOpggData(championIds: number[], position: string): Promise<{
   }
 }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('Timeout')), ms)
-  })
-  try {
-    return await Promise.race([promise, timeout])
-  } finally {
-    clearTimeout(timer!)
-  }
-}
-
 const computeRecommendation = debounce(async (session: ChampSelectSession) => {
-  if (session.timer.phase !== 'BAN_PICK') return
+  // 只在 Pick/Ban 相关阶段计算，非选人阶段跳过
+  if (session.timer.phase !== 'BAN_PICK' && session.timer.phase !== 'PLANNING') return
   if (cache?.sessionId === session.id && cache?.scores.length > 0) return
 
   const availableIds = await lcu.getPickableChampionIds().catch(() => [] as number[])
@@ -131,7 +117,10 @@ const computeRecommendation = debounce(async (session: ChampSelectSession) => {
   )
 
   cache = { sessionId: session.id, scores, useOpgg, timestamp: Date.now() }
-  onScoresUpdated?.(scores, useOpgg)
+
+  // 仅在 BAN_PICK 阶段渲染 UI，PLANNING 阶段仅预加载数据
+  const isPickPhase = session.timer.phase === 'BAN_PICK'
+  onScoresUpdated?.(isPickPhase ? scores : [], useOpgg, position)
 }, 500)
 
 function clearCache() {

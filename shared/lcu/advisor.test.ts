@@ -41,13 +41,16 @@ describe('LcuAdvisor', () => {
       debounceMs: 30,
       compute: session => ({ kind: 'rift', sessionQueueId: session.queueId }),
     })
-    advisor.onAdvice(s => snapshots.push(s))
-    advisor.start()
+    try {
+      advisor.onAdvice(s => snapshots.push(s))
+      advisor.start()
 
-    const first = await waitFor(() => snapshots[0] ?? null)
-    expect(first.kind).toBe('rift')
-    expect(first.sessionQueueId).toBe(420)
-    advisor.stop()
+      const first = await waitFor(() => snapshots[0] ?? null)
+      expect(first.kind).toBe('rift')
+      expect(first.sessionQueueId).toBe(420)
+    } finally {
+      advisor.stop()
+    }
   })
 
   it('客户端不在（无 lockfile）时静默等待，出现后自动连上', async () => {
@@ -89,13 +92,16 @@ describe('LcuAdvisor', () => {
       debounceMs: 10,
       compute: session => ({ kind: 'rift', sessionQueueId: session.queueId }),
     })
-    advisor.onStatus(s => statuses.push(s))
-    advisor.start()
-    await waitFor(() => (statuses.includes('in-champ-select') ? true : null))
+    try {
+      advisor.onStatus(s => statuses.push(s))
+      advisor.start()
+      await waitFor(() => (statuses.includes('in-champ-select') ? true : null))
 
-    await mock.stopServing() // 停服务但保留 lockfile（模拟崩溃残留）
-    await waitFor(() => (statuses.at(-1) === 'waiting' ? true : null), 5000)
-    expect(statuses.at(-1)).toBe('waiting') // 连续请求失败 ≥3 → 断开自愈
-    advisor.stop()
+      await mock.stopServing() // 停服务但保留 lockfile（模拟崩溃残留）
+      await waitFor(() => (statuses.at(-1) === 'waiting' ? true : null), 5000)
+      expect(statuses.at(-1)).toBe('waiting') // 连续请求失败 ≥3 → 断开自愈
+    } finally {
+      advisor.stop()
+    }
   })
 })

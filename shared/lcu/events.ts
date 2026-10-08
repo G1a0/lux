@@ -31,7 +31,7 @@ export function createLcuEventSocket(options: LcuEventSocketOptions): LcuEventSo
   const emitStatus = (status: SocketStatus) => statusHandlers.forEach(h => h(status))
 
   function open(): void {
-    closedByUser = false
+    if (closedByUser) return // 迟到的重连回调：用户已显式关闭
     emitStatus('connecting')
     const auth = Buffer.from(`riot:${options.password}`).toString('base64')
     const socket = new WebSocket(`wss://127.0.0.1:${options.port}/`, ['wamp'], {
@@ -71,7 +71,10 @@ export function createLcuEventSocket(options: LcuEventSocketOptions): LcuEventSo
       if (closedByUser) return
       const delay = backoff[Math.min(backoffIndex, backoff.length - 1)]
       backoffIndex += 1
-      reconnectTimer = setTimeout(open, delay)
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        open()
+      }, delay)
     })
 
     socket.on('error', () => {
@@ -80,7 +83,10 @@ export function createLcuEventSocket(options: LcuEventSocketOptions): LcuEventSo
   }
 
   return {
-    connect: open,
+    connect() {
+      closedByUser = false
+      open()
+    },
     close() {
       closedByUser = true
       if (reconnectTimer) clearTimeout(reconnectTimer)

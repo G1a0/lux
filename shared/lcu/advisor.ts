@@ -69,26 +69,47 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     setStatus('waiting')
   }
 
+  let evaluating = false
+  let pendingRerun = false
+
   async function evaluate(): Promise<void> {
     if (!readers) return
-    let session: ChampSelectSession | null
+    if (evaluating) {
+      pendingRerun = true // 单飞：进行中则安排尾随重算
+      return
+    }
+    evaluating = true
     try {
-      session = await readers.getChampSelectSession()
-      consecutiveFailures = 0
-    } catch {
-      // 客户端崩溃/重启常见于 lockfile 残留：连续失败即断开重扫（密码/端口已变）
-      consecutiveFailures += 1
-      if (consecutiveFailures >= 3) disconnect()
-      return
+      let session: ChampSelectSession | null
+      try {
+        session = await readers.getChampSelectSession()
+        consecutiveFailures = 0
+      } catch {
+        // 客户端崩溃/重启常见于 lockfile 残留：连续失败即断开重扫（密码/端口已变）
+        consecutiveFailures += 1
+        if (consecutiveFailures >= 3) disconnect()
+        return
+      }
+      if (!session) {
+        setStatus('connected')
+        return
+      }
+      setStatus('in-champ-select')
+      // 计算/回调属消费方代码：其异常不得冒泡为未处理拒绝（void evaluate）
+      try {
+        const advice = options.compute(session)
+        const snapshot: AdviceSnapshot = { ...advice, session }
+        adviceHandlers.forEach(h => h(snapshot))
+      } catch (error) {
+        console.warn('[lcu] 建议计算失败：', error)
+      }
+    } finally {
+      evaluating = false
+      if (pendingRerun) {
+        pendingRerun = false
+        scheduleEvaluate()
+      }
     }
-    if (!session) {
-      setStatus('connected')
-      return
-    }
-    setStatus('in-champ-select')
-    const advice = options.compute(session)
-    const snapshot: AdviceSnapshot = { ...advice, session }
-    adviceHandlers.forEach(h => h(snapshot))
   }
 
   function scheduleEvaluate(): void {

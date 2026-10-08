@@ -1,0 +1,19 @@
+{
+  "name": "lux",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Lux - 英雄联盟新手选人助手（独立应用）",
+  "license": "AGPL-3.0",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sync": "tsx scripts/sync-cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

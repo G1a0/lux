@@ -99,7 +99,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
   let dataDate = ''
   let anythingFailed = false
 
-  // 2a) ALL 梯度榜（盲选强度 / 规则模式候选池）
+  // 2a) ALL 梯度榜（盲选模式的强度来源）
   try {
     const allTier = await client.getTierList(patch, 'ALL')
     if (allTier && allTier.champions.length > 0) {

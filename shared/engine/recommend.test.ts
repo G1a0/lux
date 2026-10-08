@@ -74,4 +74,48 @@ describe('recommendRift', () => {
     expect(advice.spells).toBeNull()
     expect(advice.primary).toBeDefined()
   })
+
+  it('候选池为空时抛出可读错误', () => {
+    const data = makeData({ tierList: () => null, champion: () => null })
+    expect(() => recommendRift({ queueId: 420, myPosition: 'mid', allies: [], enemies: [] }, data))
+      .toThrow('候选池为空')
+  })
+
+  it('规则模式不附着符文/技能（即使数据存在）', () => {
+    const data = makeData({
+      tierList: () => null,
+      runes: () => [{ rank: 1, keystoneId: 8112, subStyleCode: 'jj', runeIds: [8112], pickRate: 0.4, winRate: 0.5, games: 1 }],
+      spells: () => [{ spellIds: [4, 14], winRate: 0.5, pickRate: 0.5 }],
+    })
+    const advice = recommendRift(CTX, data)
+    expect(advice.ruleMode).toBe(true)
+    expect(advice.runes).toBeNull()
+    expect(advice.spells).toBeNull()
+  })
+
+  it('非规则模式允许部分附着（有符文无技能）', () => {
+    const data = makeData({ spells: () => null })
+    const advice = recommendRift(CTX, data)
+    expect(advice.runes).not.toBeNull()
+    expect(advice.spells).toBeNull()
+  })
+
+  it('候选 ≥5 时备选取前 2 且按分降序', () => {
+    const six = [101, 84, 711, 112, 90, 99]
+    const tier6: Qq101TierList = {
+      date: 'x',
+      champions: six.map((id, i) => ({
+        rank: i + 1, championId: id, strengthTier: 'T1', position: 'mid' as const,
+        winRate: 0.54 - i * 0.01, pickRate: 0.1, banRate: 0.05, counterChampionIds: [],
+      })),
+    }
+    const index6 = createChampionIndex(six.map((id, i) => ({
+      id, name: `英雄${id}`, damageType: 'ap' as const, roles: ['mage' as const], difficulty: 5 + (i % 3),
+    })))
+    const data = makeData({ tierList: lane => (lane === 'MIDDLE' ? tier6 : null), champion: id => index6.get(id) })
+    const advice = recommendRift({ queueId: 420, myPosition: 'mid', allies: [], enemies: [] }, data)
+    expect(advice.alternates).toHaveLength(2)
+    const scores = [advice.primary.score, ...advice.alternates.map(a => a.score)]
+    expect(scores).toEqual([...scores].sort((a, b) => b - a))
+  })
 })

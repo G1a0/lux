@@ -63,7 +63,7 @@ export interface RiftAdvice {
   alternates: ChampionRecommendation[]
   runes: RuneAdvice | null
   spells: SpellAdvice | null
-  /** 整仓未就绪时为 true（规则模式：仅阵容契合 + 新手友好参与评分） */
+  /** 该位置（盲选为 ALL 榜）榜单缺失时为 true（规则模式：仅阵容契合 + 新手友好参与评分） */
   ruleMode: boolean
 }
 

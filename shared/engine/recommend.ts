@@ -2,9 +2,8 @@ import type { Qq101Lane } from '../positions'
 import { ALTERNATE_COUNT, RULE_MODE_WEIGHTS, WEIGHTS_BY_QUEUE } from './config'
 import { buildCandidatePool, toQq101Lane } from './candidates'
 import type { EngineData } from './data'
-import { scoreAll, type ScoreOptions } from './score'
+import { scoreAll } from './score'
 import type {
-  ChampionRecommendation,
   DraftContext,
   QueueId,
   RiftAdvice,
@@ -14,16 +13,6 @@ import type {
 
 const MODE_LABELS: Record<QueueId, string> = {
   420: '排位', 440: '排位', 400: '征召', 430: '匹配', 450: '大乱斗',
-}
-
-/** 通用排序入口（大乱斗等复用） */
-export function rankChampions(
-  championIds: number[],
-  ctx: DraftContext,
-  data: EngineData,
-  options: ScoreOptions,
-): ChampionRecommendation[] {
-  return scoreAll(championIds, ctx, data, options)
 }
 
 export function recommendRift(ctx: DraftContext, data: EngineData): RiftAdvice {

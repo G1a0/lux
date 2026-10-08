@@ -4,7 +4,7 @@
 
 **Goal:** 为 Lux v2 独立应用搭好脚手架并交付可运行的 101.qq.com 数据层：时段门控、本地数据仓、Node 客户端、同步器与 CLI。
 
-**Architecture:** 纯 TS 的 `shared/` 模块（解析器/端点/客户端/数据仓/同步器/timeGate，全部可单测）+ `scripts/` CLI；旧 Pengu 插件代码冻结不再构建（仅 positions/qq101/测试/fixtures 迁移进新结构）。同步器只在允许时段出网（工作日 9:00–12:00、14:00–18:00 禁止，全场景约束），选人阶段零外部请求留待 Phase 2。
+**Architecture:** 纯 TS 的 `shared/` 模块（解析器/端点/客户端/数据仓/同步器/timeGate，全部可单测）+ `scripts/` CLI；旧 Pengu 插件代码已于 2026-10-08 删除（tag `archive/pengu-loader-plugin` 归档全部旧文件，可用 `git show archive/pengu-loader-plugin:<path>` 取回），positions/qq101/测试从该 tag 重建进 `shared/`。同步器只在允许时段出网（工作日 9:00–12:00、14:00–18:00 禁止，全场景约束），选人阶段零外部请求留待 Phase 2。
 
 **Tech Stack:** TypeScript(ESM) + vitest + tsx（跑 CLI）+ node:fs（JSON 快照，无数据库）
 
@@ -19,9 +19,8 @@
 **Files:**
 - Create: `shared/qq101/fixtures/recon-*.json`（新增样本，按发现命名）
 - Create: `shared/qq101/recon-notes.md`
-- Modify: `shared/qq101/fixtures/README.md`（若该文件尚在旧位置，先跳过，Task 2 后回来补）
 
-**背景：** 已知端点（解析器已覆盖）：versionlist、`lol_101strategy`（梯度榜）、`_confront`（对位）、`_partner`（协同）。未知：① 符文端点（本地 fixture `fuwen-aram-rank-20261007.json` 来源 URL 未记录）；② 召唤师技能是否有独立端点；③ 大乱斗模式的 mode/queue 参数。本任务的产出是「发现清单 + 新样本 + 字段语义结论」，供 Phase 2 使用。
+**背景：** 已知端点（解析器已覆盖）：versionlist、`lol_101strategy`（梯度榜）、`_confront`（对位）、`_partner`（协同）。未知：① 符文端点（本地 fixture `shared/qq101/fixtures/fuwen-aram-rank-20261007.json` 来源 URL 未记录）；② 召唤师技能是否有独立端点；③ 大乱斗模式的 mode/queue 参数。本任务的产出是「发现清单 + 新样本 + 字段语义结论」，供 Phase 2 使用。
 
 - [ ] **Step 0: 核对时间窗**
 
@@ -69,7 +68,7 @@ curl -s 'https://mlol.qt.qq.com/go/battle_info/odp_proxy/lol_101strategy_fuwen?i
 curl -s 'https://mlol.qt.qq.com/go/battle_info/odp_proxy/lol_101strategy?itier=255&version_id=<ver>&lane=ALL&conftype=aram' | head -c 400
 ```
 
-Expected: 返回 `{"code":0,...}` 且外层形态与已有 fixture（`_fieldValues` / `result`）一致即命中；与本地 `fuwen-aram-rank-20261007.json` 的开头做对比确认同源。
+Expected: 返回 `{"code":0,...}` 且外层形态与已有 fixture（`_fieldValues` / `result`）一致即命中；与本地 `shared/qq101/fixtures/fuwen-aram-rank-20261007.json` 的开头做对比确认同源。
 - 符文命中 → 保存为 `shared/qq101/fixtures/recon-fuwen-<日期>.json`
 - 大乱斗榜命中 → 保存为 `shared/qq101/fixtures/recon-aram-tier-<日期>.json`
 - 技能端点：若 Step 2 找到线索则同样验证并保存；找不到 → 记录「未找到，Phase 2 用内置规则兜底」
@@ -108,40 +107,42 @@ git commit -m "chore: capture qq101 endpoint recon samples and notes"
 
 ---
 
-### Task 1: 脚手架 + 迁移 positions（含 fixtures 目录迁移）
+### Task 1: 脚手架（干净起点）+ 重建 positions
 
 **Files:**
-- Modify: `package.json`（scripts/deps/description）
-- Modify: `tsconfig.json`（整体替换为 app 作用域）
-- Modify: `vitest.config.mts`（整体替换）
-- Modify: `.gitignore`（加 `data/`）
-- Move: `src/lib/positions.ts` → `shared/positions.ts`
-- Move: `src/lib/positions.test.ts` → `shared/positions.test.ts`（改 import）
-- Move: `src/test/fixtures/qq101/*` → `shared/qq101/fixtures/`
+- Create: `package.json`、`tsconfig.json`、`vitest.config.mts`、`README.md`
+- Create: `shared/positions.ts`、`shared/positions.test.ts`（从归档 tag 重建）
+- Modify: `.gitignore`（追加 `data/`）
 
-- [ ] **Step 1: 安装依赖**
+**前置（已完成）：** 旧插件代码已删除并打 tag 归档（`archive/pengu-loader-plugin`，可用 `git show archive/pengu-loader-plugin:<path>` 取回任何旧文件）；fixtures 已迁移到 `shared/qq101/fixtures/`。
 
-```bash
-npm i -D tsx @types/node
-```
-
-Expected: package.json devDependencies 新增 tsx、@types/node。
-
-- [ ] **Step 2: 更新 package.json**
-
-scripts 替换为（删除旧 dev/build/pack 与 `config` 块——旧插件构建不再运行）：
+- [ ] **Step 1: 写最小 package.json**
 
 ```json
-"scripts": {
-  "test": "vitest run",
-  "typecheck": "tsc --noEmit",
-  "sync": "tsx scripts/sync-cli.ts"
+{
+  "name": "lux",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Lux - 英雄联盟新手选人助手（独立应用）",
+  "license": "AGPL-3.0",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "sync": "tsx scripts/sync-cli.ts"
+  }
 }
 ```
 
-同时把 `"description"` 改为 `"Lux - 英雄联盟新手选人助手（独立应用）"`。
+- [ ] **Step 2: 安装依赖**
 
-- [ ] **Step 3: 替换 tsconfig.json**
+```bash
+npm i -D typescript vitest tsx @types/node
+```
+
+Expected: devDependencies 写入 package.json；node_modules 与 package-lock.json 重建。
+
+- [ ] **Step 3: 写 tsconfig.json**
 
 ```json
 {
@@ -165,7 +166,7 @@ scripts 替换为（删除旧 dev/build/pack 与 `config` 块——旧插件构�
 }
 ```
 
-- [ ] **Step 4: 替换 vitest.config.mts**
+- [ ] **Step 4: 写 vitest.config.mts**
 
 ```ts
 import { defineConfig } from 'vitest/config'
@@ -178,30 +179,25 @@ export default defineConfig({
 })
 ```
 
-（旧 `src/**` 测试不再运行——旧插件代码冻结；被迁移模块的测试随迁移继续跑。）
+（旧 `src/**` 已随清理删除，无需排除。）
 
 - [ ] **Step 5: .gitignore 追加运行时数据目录**
 
 在 `.gitignore` 末尾加一行：`data/`
 
-- [ ] **Step 6: 迁移 positions**
+- [ ] **Step 6: 从归档重建 positions**
 
 ```bash
 mkdir -p shared
-git mv src/lib/positions.ts shared/positions.ts
-git mv src/lib/positions.test.ts shared/positions.test.ts
+git show archive/pengu-loader-plugin:src/lib/positions.ts > shared/positions.ts
+git show archive/pengu-loader-plugin:src/lib/positions.test.ts > shared/positions.test.ts
 ```
 
 编辑 `shared/positions.test.ts`：把 `from '@/lib/positions'` 改为 `from './positions'`。`shared/positions.ts` 自身无 import，内容保持原样。
 
-- [ ] **Step 7: 迁移 fixtures 目录**
+- [ ] **Step 7: 写新的 README.md**
 
-```bash
-mkdir -p shared/qq101/fixtures
-git mv src/test/fixtures/qq101/* shared/qq101/fixtures/
-```
-
-若 `src/test/fixtures/qq101/fuwen-aram-rank-20261007.json` 是未跟踪文件，用 `mv` 而非 `git mv`，然后 `git add shared/qq101/fixtures/fuwen-aram-rank-20261007.json`。
+（旧插件 README 已随清理删除。）内容包含：一句话定位（Lux v2：面向英雄联盟新手的独立选人助手，基于 101.qq.com 数据）、当前状态（Phase 1 数据层进行中）、开发命令（`npm run test` / `npm run typecheck` / `npm run sync`）、设计与计划文档入口（`docs/superpowers/`）。
 
 - [ ] **Step 8: 验证**
 
@@ -213,18 +209,18 @@ Expected: 无错误（若此时仅有 positions 一个文件，也应为 0 错�
 - [ ] **Step 9: 提交**
 
 ```bash
-git add package.json package-lock.json tsconfig.json vitest.config.mts .gitignore shared/positions.ts shared/positions.test.ts shared/qq101/fixtures
-git commit -m "chore: switch project scaffold to app scope, migrate positions and fixtures"
+git add package.json package-lock.json tsconfig.json vitest.config.mts README.md .gitignore shared/
+git commit -m "chore: scaffold v2 workspace from clean slate, rebuild positions module"
 ```
 
 ---
 
-### Task 2: 迁移 qq101 解析层（拆分为 types / parse / endpoints）
+### Task 2: 重建 qq101 解析层（types / parse / endpoints）
 
 **Files:**
-- Move+split: `src/lib/qq101.ts` → `shared/qq101/{types.ts, parse.ts, endpoints.ts}`（原文件删除）
-- Move: `src/lib/qq101.test.ts` → `shared/qq101/parse.test.ts`（改 import）
-- 说明：`src/lib/qq101-client.test.ts` 保持原状不动（冻结、不再运行；其覆盖由 Task 5 的 Node 版测试取代）
+- Create: `shared/qq101/{types.ts, parse.ts, endpoints.ts}`（内容依据归档 tag 中的 `src/lib/qq101.ts` 拆分，逐字保留解析逻辑）
+- Create: `shared/qq101/parse.test.ts`（从归档 tag 重建 + 修正 import）
+- 说明：fixtures 已在 `shared/qq101/fixtures/`（清理提交迁移），本任务不改动它们。
 
 - [ ] **Step 1: 写 types.ts**
 
@@ -420,16 +416,15 @@ export function riftUrl(
 }
 ```
 
-- [ ] **Step 4: 删除旧 qq101.ts 并迁移解析测试**
+- [ ] **Step 4: 从归档重建解析测试**
 
 ```bash
-git rm src/lib/qq101.ts
-git mv src/lib/qq101.test.ts shared/qq101/parse.test.ts
+mkdir -p shared/qq101
+git show archive/pengu-loader-plugin:src/lib/qq101.test.ts > shared/qq101/parse.test.ts
 ```
 
 编辑 `shared/qq101/parse.test.ts`：
 - `from '@/lib/qq101'` → `from './parse'`（解析函数）
-- 若引用了 `./endpoints` 的常量/函数则改为 `from './endpoints'`
 - fixture 导入 `'@/test/fixtures/qq101/X.json'` → `'./fixtures/X.json'`
 - 若有用例调用 fetch 客户端函数（getPatch/getTierList/getMatchups/getSynergies），删除这些用例（其覆盖由 Task 5 取代）
 
@@ -444,8 +439,8 @@ Expected: 0 错误。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add shared/qq101 src/lib/qq101.ts src/lib/qq101.test.ts
-git commit -m "refactor: split qq101 parser into shared/qq101 (types/parse/endpoints)"
+git add shared/qq101
+git commit -m "refactor: rebuild qq101 parser layer into shared/qq101"
 ```
 
 ---
@@ -1262,7 +1257,7 @@ git commit -m "feat: add rift data sync orchestrator with window gating"
 
 **Files:**
 - Create: `scripts/sync-cli.ts`
-- Modify: `shared/qq101/fixtures/README.md`（若 Task 0 已更新则跳过）
+- （无需改动 `shared/qq101/fixtures/` 下的既有文件）
 
 - [ ] **Step 1: 实现 CLI**
 

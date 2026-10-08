@@ -781,7 +781,7 @@ export function createLcuEventSocket(options: LcuEventSocketOptions): LcuEventSo
   const emitStatus = (status: SocketStatus) => statusHandlers.forEach(h => h(status))
 
   function open(): void {
-    closedByUser = false
+    if (closedByUser) return // 迟到的重连回调：用户已显式关闭
     emitStatus('connecting')
     const auth = Buffer.from(`riot:${options.password}`).toString('base64')
     ws = new WebSocket(`wss://127.0.0.1:${options.port}/`, ['wamp'], {
@@ -815,7 +815,10 @@ export function createLcuEventSocket(options: LcuEventSocketOptions): LcuEventSo
       if (closedByUser) return
       const delay = backoff[Math.min(backoffIndex, backoff.length - 1)]
       backoffIndex += 1
-      reconnectTimer = setTimeout(open, delay)
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        open()
+      }, delay)
     })
 
     ws.on('error', () => {
@@ -824,7 +827,10 @@ export function createLcuEventSocket(options: LcuEventSocketOptions): LcuEventSo
   }
 
   return {
-    connect: open,
+    connect() {
+      closedByUser = false
+      open()
+    },
     close() {
       closedByUser = true
       if (reconnectTimer) clearTimeout(reconnectTimer)
@@ -1896,26 +1902,47 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     setStatus('waiting')
   }
 
+  let evaluating = false
+  let pendingRerun = false
+
   async function evaluate(): Promise<void> {
     if (!readers) return
-    let session: ChampSelectSession | null
+    if (evaluating) {
+      pendingRerun = true // 单飞：进行中则安排尾随重算
+      return
+    }
+    evaluating = true
     try {
-      session = await readers.getChampSelectSession()
-      consecutiveFailures = 0
-    } catch {
-      // 客户端崩溃/重启常见于 lockfile 残留：连续失败即断开重扫（密码/端口已变）
-      consecutiveFailures += 1
-      if (consecutiveFailures >= 3) disconnect()
-      return
+      let session: ChampSelectSession | null
+      try {
+        session = await readers.getChampSelectSession()
+        consecutiveFailures = 0
+      } catch {
+        // 客户端崩溃/重启常见于 lockfile 残留：连续失败即断开重扫（密码/端口已变）
+        consecutiveFailures += 1
+        if (consecutiveFailures >= 3) disconnect()
+        return
+      }
+      if (!session) {
+        setStatus('connected')
+        return
+      }
+      setStatus('in-champ-select')
+      // 计算/回调属消费方代码：其异常不得冒泡为未处理拒绝（void evaluate）
+      try {
+        const advice = options.compute(session)
+        const snapshot: AdviceSnapshot = { ...advice, session }
+        adviceHandlers.forEach(h => h(snapshot))
+      } catch (error) {
+        console.warn('[lcu] 建议计算失败：', error)
+      }
+    } finally {
+      evaluating = false
+      if (pendingRerun) {
+        pendingRerun = false
+        scheduleEvaluate()
+      }
     }
-    if (!session) {
-      setStatus('connected')
-      return
-    }
-    setStatus('in-champ-select')
-    const advice = options.compute(session)
-    const snapshot: AdviceSnapshot = { ...advice, session }
-    adviceHandlers.forEach(h => h(snapshot))
   }
 
   function scheduleEvaluate(): void {

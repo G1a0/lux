@@ -16,7 +16,8 @@ import {
 } from '@/lib/features/champion-recommendation'
 import { tryInjectBadges, tryHighlightChampion } from '@/components/ChampionBadgeOverlay'
 import { RecommendationPanel } from '@/components/RecommendationPanel'
-import type { ChampionScore } from '@/lib/scorer'
+import type { ChampionScore, DataSource } from '@/lib/scorer'
+import type { InternalPosition } from '@/lib/positions'
 import '@/styles/index.css'
 
 const PLUGIN_NAME = 'Lux'
@@ -44,33 +45,40 @@ let panelContainer: HTMLDivElement | null = null
 let badgeInjectTask: (() => boolean) | null = null
 let highlightTasks: Array<() => boolean> = []
 
-function updatePanelRender(scores: ChampionScore[], useOpgg: boolean, position: string, visible: boolean) {
+function updatePanelRender(
+  scores: ChampionScore[],
+  dataSource: DataSource,
+  position: InternalPosition | '',
+  dataDate: string,
+  visible: boolean,
+) {
   if (!panelRoot || !panelContainer) return
 
   panelRoot.render(
     createElement(RecommendationPanel, {
       scores,
       assignedPosition: position,
-      useOpgg,
+      dataSource,
+      dataDate,
       visible,
-      onClose: () => updatePanelRender(scores, useOpgg, position, false),
+      onClose: () => updatePanelRender(scores, dataSource, position, dataDate, false),
     }),
   )
 }
 
-function updateInjections(scores: ChampionScore[], useOpgg: boolean) {
+function updateInjections(scores: ChampionScore[], dataSource: DataSource) {
   if (badgeInjectTask) injector.unregister(badgeInjectTask)
   highlightTasks.forEach(t => injector.unregister(t))
   highlightTasks = []
 
   if (scores.length === 0) return
 
-  badgeInjectTask = tryInjectBadges(scores, useOpgg)
+  badgeInjectTask = tryInjectBadges(scores, dataSource)
   injector.register(badgeInjectTask)
 
   const top3 = scores.slice(0, 3)
   for (const score of top3) {
-    const task = tryHighlightChampion(score, useOpgg)
+    const task = tryHighlightChampion(score, dataSource)
     highlightTasks.push(task)
     injector.register(task)
   }
@@ -93,16 +101,16 @@ export function load() {
 
   startRecommendation()
 
-  setOnScoresUpdated((scores, useOpgg, position) => {
-    updateInjections(scores, useOpgg)
-    updatePanelRender(scores, useOpgg, position, scores.length > 0)
+  setOnScoresUpdated((scores, dataSource, position, dataDate) => {
+    updateInjections(scores, dataSource)
+    updatePanelRender(scores, dataSource, position, dataDate, scores.length > 0)
   })
 
   setOnClearRecommendation(() => {
     if (badgeInjectTask) injector.unregister(badgeInjectTask)
     highlightTasks.forEach(t => injector.unregister(t))
     highlightTasks = []
-    updatePanelRender([], false, '', false)
+    updatePanelRender([], 'local', '', '', false)
   })
 
   injector.start()
@@ -147,5 +155,5 @@ function mountApp() {
   document.body.appendChild(panelContainer)
   panelRoot = createRoot(panelContainer)
 
-  updatePanelRender([], false, '', false)
+  updatePanelRender([], 'local', '', '', false)
 }

@@ -1,21 +1,20 @@
 // src/components/RecommendationPanel.tsx
 
 import { createPortal } from 'react-dom'
-import type { ChampionScore } from '@/lib/scorer'
-import type { ChampionMeta } from '@/types/champion'
-import championMetaRaw from '@/data/champion-meta.json'
-
-const championMetaData = championMetaRaw as unknown as ChampionMeta
+import type { ChampionScore, DataSource } from '@/lib/scorer'
+import { getChampionName, getDamageType, getChampionPositions } from '@/lib/champion-data'
+import { POSITION_LABELS, type InternalPosition } from '@/lib/positions'
 
 interface PanelProps {
   scores: ChampionScore[]
-  assignedPosition: string
-  useOpgg: boolean
+  assignedPosition: InternalPosition | ''
+  dataSource: DataSource
+  dataDate: string
   visible: boolean
   onClose: () => void
 }
 
-export function RecommendationPanel({ scores, assignedPosition, useOpgg, visible, onClose }: PanelProps) {
+export function RecommendationPanel({ scores, assignedPosition, dataSource, dataDate, visible, onClose }: PanelProps) {
   if (!visible) return null
 
   const grouped = groupByPosition(scores, assignedPosition)
@@ -37,7 +36,9 @@ export function RecommendationPanel({ scores, assignedPosition, useOpgg, visible
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <h3 style={{ margin: 0, fontSize: '16px', color: '#f0c040' }}>
           Lux 推荐
-          {!useOpgg && <span style={{ fontSize: '11px', color: '#888', marginLeft: '8px' }}>(本地数据)</span>}
+          {dataSource === 'local'
+            ? <span style={{ fontSize: '11px', color: '#888', marginLeft: '8px' }}>(本地数据)</span>
+            : dataDate ? <span style={{ fontSize: '11px', color: '#888', marginLeft: '8px' }}>数据 {dataDate}</span> : null}
         </h3>
         <button onClick={onClose} style={{
           background: 'none', border: 'none', color: '#888',
@@ -58,7 +59,7 @@ export function RecommendationPanel({ scores, assignedPosition, useOpgg, visible
           return (
             <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span style={{ color: '#888', minWidth: '32px', fontSize: '12px' }}>
-                {championMetaData.positionLabels[pos as keyof typeof championMetaData.positionLabels] ?? pos}
+                {POSITION_LABELS[pos] ?? pos}
               </span>
               <ChampionRow score={top} compact />
             </div>
@@ -84,8 +85,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function ChampionRow({ score, compact = false }: { score: ChampionScore; compact?: boolean }) {
-  const meta = championMetaData.champions[String(score.championId)]
-  const name = meta?.name ?? `英雄 #${score.championId}`
+  const name = getChampionName(score.championId)
 
   return (
     <div style={{
@@ -116,8 +116,11 @@ function ChampionRow({ score, compact = false }: { score: ChampionScore; compact
 
 function CompositionAnalysis({ scores }: { scores: ChampionScore[] }) {
   const top5 = scores.slice(0, 5)
-  const apChamps = top5.filter(s => championMetaData.damageTypes[String(s.championId)] === 'ap').length
-  const adCount = top5.length - apChamps
+  const apChamps = top5.filter(s => getDamageType(s.championId) === 'ap').length
+  const adCount = top5.filter(s => {
+    const type = getDamageType(s.championId)
+    return type === 'ad' || type === 'mixed'
+  }).length
 
   return (
     <div style={{ fontSize: '11px', color: '#888', lineHeight: 1.6 }}>
@@ -128,20 +131,15 @@ function CompositionAnalysis({ scores }: { scores: ChampionScore[] }) {
   )
 }
 
-function groupByPosition(scores: ChampionScore[], assigned: string) {
+function groupByPosition(scores: ChampionScore[], assigned: InternalPosition | '') {
   const byPosition: Record<string, ChampionScore[]> = {}
   for (const s of scores) {
-    const meta = championMetaData.champions[String(s.championId)]
-    const positions = meta?.positions ?? []
-    for (const pos of positions) {
+    for (const pos of getChampionPositions(s.championId)) {
       if (!byPosition[pos]) byPosition[pos] = []
       byPosition[pos].push(s)
     }
   }
 
-  const recommended = assigned && byPosition[assigned]
-    ? byPosition[assigned]
-    : scores
-
+  const recommended = assigned && byPosition[assigned] ? byPosition[assigned] : scores
   return { recommended, byPosition }
 }

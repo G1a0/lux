@@ -1,6 +1,6 @@
 // src/components/ChampionBadgeOverlay.tsx
 
-import type { ChampionScore } from '@/lib/scorer'
+import type { ChampionScore, DataSource } from '@/lib/scorer'
 
 function getChampionIdFromElement(el: HTMLElement): number | null {
   const dataId = el.getAttribute('data-champion-id')
@@ -11,7 +11,7 @@ function getChampionIdFromElement(el: HTMLElement): number | null {
   return match ? parseInt(match[1], 10) : null
 }
 
-function createBadgeElement(score: ChampionScore, useOpgg: boolean): HTMLElement {
+function createBadgeElement(score: ChampionScore, dataSource: DataSource): HTMLElement {
   const badge = document.createElement('div')
   badge.className = 'lux-badge'
 
@@ -47,7 +47,7 @@ function createBadgeElement(score: ChampionScore, useOpgg: boolean): HTMLElement
     return badge // neutral: don't show
   }
 
-  if (!useOpgg) {
+  if (dataSource === 'local') {
     badge.style.background = '#888'
   }
 
@@ -58,13 +58,13 @@ function createBadgeElement(score: ChampionScore, useOpgg: boolean): HTMLElement
     `克制: ${score.counter}`,
     `强度: ${score.meta}`,
     `平衡: ${score.balance}`,
-    useOpgg ? '(OP.GG数据)' : '(本地数据)',
+    dataSource === 'qq101' ? '(国服数据)' : '(本地数据)',
   ].join('\n')
 
   return badge
 }
 
-export function tryInjectBadges(scores: ChampionScore[], useOpgg: boolean): () => boolean {
+export function tryInjectBadges(scores: ChampionScore[], dataSource: DataSource): () => boolean {
   const scoreMap = new Map(scores.map(s => [s.championId, s]))
 
   return () => {
@@ -82,7 +82,7 @@ export function tryInjectBadges(scores: ChampionScore[], useOpgg: boolean): () =
 
       if (el.querySelector('.lux-badge')) return
 
-      const badge = createBadgeElement(score, useOpgg)
+      const badge = createBadgeElement(score, dataSource)
       if (badge.children.length === 0 && !badge.textContent) return
 
       el.style.position = 'relative'
@@ -108,7 +108,7 @@ function findChampionElement(championId: number): HTMLElement | null {
   return null
 }
 
-export function tryHighlightChampion(score: ChampionScore, _useOpgg: boolean): () => boolean {
+export function tryHighlightChampion(score: ChampionScore, _dataSource: DataSource): () => boolean {
   return () => {
     const parent = findChampionElement(score.championId)
     if (!parent || parent.hasAttribute('data-lux-highlighted')) return true

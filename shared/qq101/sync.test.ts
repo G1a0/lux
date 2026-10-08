@@ -11,7 +11,11 @@ import type { Qq101Lane } from '../positions'
 // 三个英雄的小型样本，便于断言
 const CHAMPS = [84, 711, 876]
 
-interface FakeCall { kind: 'tier' | 'matchups' | 'synergies'; lane: Qq101Lane; championId?: number }
+interface FakeCall {
+  kind: 'tier' | 'matchups' | 'synergies' | 'runes' | 'spells' | 'aram'
+  lane: Qq101Lane | 'ALL' | null
+  championId?: number
+}
 
 function fakeTier(championIds: number[], date = '2026-10-08'): Qq101TierList {
   return {
@@ -35,7 +39,7 @@ function createFakeClient(opts: {
   const client: Qq101Client = {
     async getPatch() { return '16.19' },
     async getTierList(_patch, lane) {
-      calls.push({ kind: 'tier', lane: lane as Qq101Lane })
+      calls.push({ kind: 'tier', lane })
       if (opts.emptyTier) return { date: '', champions: [] }
       return fakeTier(opts.champsByLane?.[lane as Qq101Lane] ?? CHAMPS)
     },
@@ -51,10 +55,26 @@ function createFakeClient(opts: {
       if (opts.failPairs || opts.failChampions?.includes(championId)) return null
       return [{ championId: 998, winRate: 0.58, games: 100 }]
     },
-    // 临时桩：Task 4 会用完整实现替换这三个方法
-    async getRunePages(): Promise<Qq101RunePage[] | null> { return null },
-    async getSpellCombos(): Promise<Qq101SpellCombo[] | null> { return null },
-    async getAramOverview(): Promise<Qq101AramHero[] | null> { return null },
+    async getRunePages(_patch, lane, championId): Promise<Qq101RunePage[] | null> {
+      if (remaining-- <= 0) throw new ApiTimeBlockedError(new Date())
+      calls.push({ kind: 'runes', lane, championId })
+      if (opts.failPairs || opts.failChampions?.includes(championId)) return null
+      return [{ rank: 1, keystoneId: 8112, subStyleCode: 'jj', runeIds: [8112], pickRate: 0.4, winRate: 0.5, games: 100 }]
+    },
+    async getSpellCombos(_patch, lane, championId): Promise<Qq101SpellCombo[] | null> {
+      if (remaining-- <= 0) throw new ApiTimeBlockedError(new Date())
+      calls.push({ kind: 'spells', lane, championId })
+      if (opts.failPairs || opts.failChampions?.includes(championId)) return null
+      return [{ spellIds: [4, 14], winRate: 0.48, pickRate: 0.9 }]
+    },
+    async getAramOverview(_dtstatdate): Promise<Qq101AramHero[] | null> {
+      calls.push({ kind: 'aram', lane: null })
+      if (opts.failPairs) return null
+      return [{
+        championId: 22, rank: 1, rankChange: '未变化', winRate: 0.5456, pickRate: 0.1539,
+        bestPartners: [], avgDeathTime: 233, avgParticipation: 0.66, avgDamageRatio: 0.21, avgTankRatio: 0.16,
+      }]
+    },
   }
   return { client, calls }
 }
@@ -81,11 +101,18 @@ describe('syncRiftData', () => {
     const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
     expect(result.status).toBe('synced')
     expect(result.patch).toBe('16.19')
-    expect(calls.filter(c => c.kind === 'tier')).toHaveLength(1)
+    expect(calls.filter(c => c.kind === 'tier')).toHaveLength(2)
     expect(calls.filter(c => c.kind === 'matchups')).toHaveLength(3)
     expect(calls.filter(c => c.kind === 'synergies')).toHaveLength(3)
+    expect(calls.filter(c => c.kind === 'runes')).toHaveLength(3)
+    expect(calls.filter(c => c.kind === 'spells')).toHaveLength(3)
     expect(wh.hasTier('16.19', 'MIDDLE')).toBe(true)
+    expect(wh.hasTier('16.19', 'ALL')).toBe(true)
     expect(wh.hasMatchups('16.19', 'MIDDLE', 84)).toBe(true)
+    expect(wh.hasRunes('16.19', 'MIDDLE', 84)).toBe(true)
+    expect(wh.hasSpells('16.19', 'MIDDLE', 711)).toBe(true)
+    expect(result.runes).toMatchObject({ fetched: 3, failed: 0 })
+    expect(result.spells).toMatchObject({ fetched: 3, failed: 0 })
     expect(wh.readManifest()).toMatchObject({ patch: '16.19', dataDate: '2026-10-08' })
   })
 
@@ -95,7 +122,7 @@ describe('syncRiftData', () => {
     const second = createFakeClient()
     const result = await syncRiftData({ client: second.client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
     expect(result.status).toBe('up-to-date')
-    expect(second.calls.filter(c => c.kind !== 'tier')).toHaveLength(0)
+    expect(second.calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram')).toHaveLength(0)
   })
 
   it('个别英雄失败 → partial，计数正确；重跑会补齐', async () => {
@@ -128,7 +155,7 @@ describe('syncRiftData', () => {
   it('对位/协同只按各位置自己的榜单英雄取数', async () => {
     const { client, calls } = createFakeClient({ champsByLane: { MIDDLE: [84, 711], TOP: [122] } })
     await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['TOP', 'MIDDLE'] })
-    const pairCalls = calls.filter(c => c.kind !== 'tier')
+    const pairCalls = calls.filter(c => c.kind === 'matchups' || c.kind === 'synergies')
     const topCalls = pairCalls.filter(c => c.lane === 'TOP').map(c => c.championId).sort((a, b) => a! - b!)
     const midCalls = pairCalls.filter(c => c.lane === 'MIDDLE').map(c => c.championId).sort((a, b) => a! - b!)
     expect(topCalls).toEqual([122, 122]) // 只发 122 的对位+协同，不发 MIDDLE 英雄的 TOP 数据
@@ -142,7 +169,31 @@ describe('syncRiftData', () => {
       abortAfterConsecutiveFailures: 1,
     })
     expect(result.status).toBe('partial')
-    // 无熔断时会有 3 对位 + 3 协同 = 6 个请求；熔断后最多只发出首批对位请求
-    expect(calls.filter(c => c.kind !== 'tier').length).toBeLessThanOrEqual(3)
+    // 首轮 3 个 worker 各发出 1 个 matchups 后即熔断，符文/技能不再发出
+    expect(calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram')).toHaveLength(3)
+  })
+
+  it('大乱斗总览单发一次并写 manifest.aramDate', async () => {
+    const { client, calls } = createFakeClient()
+    const result = await syncRiftData({
+      client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'],
+      now: () => new Date(2026, 9, 8, 13, 0),
+    })
+    expect(result.aram).toBe('synced')
+    expect(calls.filter(c => c.kind === 'aram')).toHaveLength(1)
+    expect(wh.hasAram('20261007')).toBe(true)
+    expect(wh.readManifest()?.aramDate).toBe('20261007')
+  })
+
+  it('大乱斗总览已是最新日期则跳过', async () => {
+    wh.writeManifest({ patch: '16.19', dataDate: '2026-10-08', updatedAt: 'x', aramDate: '20261007' })
+    wh.saveAram('20261007', [])
+    const { client, calls } = createFakeClient()
+    const result = await syncRiftData({
+      client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'],
+      now: () => new Date(2026, 9, 8, 13, 0),
+    })
+    expect(result.aram).toBe('skipped')
+    expect(calls.filter(c => c.kind === 'aram')).toHaveLength(0)
   })
 })

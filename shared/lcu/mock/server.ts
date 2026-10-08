@@ -5,6 +5,7 @@ import { createServer, type Server } from 'node:https'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { WebSocketServer, type WebSocket } from 'ws'
 
 export interface MockRouteResult {
   status?: number
@@ -17,6 +18,8 @@ export interface MockLcuOptions {
   certDir: string
   routes: Record<string, MockRouteResult>
   password?: string
+  /** 是否启用 WSS 事件通道（默认 true） */
+  wssEnabled?: boolean
 }
 
 export interface ReceivedRequest {
@@ -31,6 +34,10 @@ export interface MockLcu {
   lcuDir: string
   received: ReceivedRequest[]
   server: Server
+  /** 向所有已订阅（发过 [5,"OnJsonApiEvent"] 帧）的连接推送 [8,...] 事件 */
+  pushEvent(uri: string, eventType: string, data: unknown): void
+  /** 断开所有 WS 客户端（监听保留，模拟 LCU 重启） */
+  closeClients(): void
   stop(): Promise<void>
 }
 
@@ -82,18 +89,44 @@ export async function createMockLcu(options: MockLcuOptions): Promise<MockLcu> {
   const address = server.address()
   const port = typeof address === 'object' && address ? address.port : 0
 
+  // WSS 事件通道：与 HTTPS 共享同一端口（upgrade 请求）。自签证书由客户端 rejectUnauthorized:false 放行。
+  const wss = options.wssEnabled === false ? null : new WebSocketServer({ server, path: '/' })
+  const subscribed = new Set<WebSocket>()
+  if (wss) {
+    wss.on('connection', client => {
+      client.on('message', raw => {
+        try {
+          const msg = JSON.parse(String(raw)) as unknown
+          if (Array.isArray(msg) && msg[0] === 5) subscribed.add(client)
+        } catch {
+          // 非 JSON 消息忽略
+        }
+      })
+      client.on('close', () => subscribed.delete(client))
+    })
+  }
+
   const lcuDir = mkdtempSync(join(tmpdir(), 'lux-mock-lcu-'))
   writeFileSync(join(lcuDir, 'lockfile'), `LeagueClient:1:${port}:${password}:https`)
 
-  return {
-    port,
-    password,
-    lcuDir,
-    received,
-    server,
-    async stop() {
-      await new Promise<void>(resolve => server.close(() => resolve()))
-      rmSync(lcuDir, { recursive: true, force: true })
-    },
+  function pushEvent(uri: string, eventType: string, data: unknown): void {
+    const frame = JSON.stringify([8, 'OnJsonApiEvent', { uri, eventType, data }])
+    for (const client of subscribed) {
+      if (client.readyState === client.OPEN) client.send(frame)
+    }
   }
+
+  function closeClients(): void {
+    if (!wss) return
+    for (const client of wss.clients) client.terminate()
+  }
+
+  async function stop(): Promise<void> {
+    closeClients() // 先断开客户端，避免 wss.close 等待悬挂连接
+    if (wss) await new Promise<void>(resolve => wss.close(() => resolve()))
+    await new Promise<void>(resolve => server.close(() => resolve()))
+    rmSync(lcuDir, { recursive: true, force: true })
+  }
+
+  return { port, password, lcuDir, received, server, pushEvent, closeClients, stop }
 }

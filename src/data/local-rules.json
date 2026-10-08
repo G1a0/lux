@@ -1,6 +1,0 @@
-{
-  "counters": {},
-  "synergies": {},
-  "version": "0.1.0",
-  "description": "Phase 1 使用空规则集，所有评分中性。后续版本从 OP.GG 历史数据预生成。"
-}

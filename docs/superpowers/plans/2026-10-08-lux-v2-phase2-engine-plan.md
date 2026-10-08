@@ -1239,11 +1239,11 @@ import type {
   Qq101Synergy,
   Qq101TierList,
 } from '../qq101/types'
-import type { Warehouse } from '../warehouse/store'
+import type { LaneKey, Warehouse } from '../warehouse/store'
 import type { ChampionIndex, ChampionMeta } from '../champions/meta'
 
 export interface EngineData {
-  tierList(lane: Qq101Lane | 'ALL'): Qq101TierList | null
+  tierList(lane: LaneKey): Qq101TierList | null
   matchups(lane: Qq101Lane, championId: number): Qq101Matchup[] | null
   synergies(lane: Qq101Lane, championId: number): Qq101Synergy[] | null
   runes(lane: Qq101Lane, championId: number): Qq101RunePage[] | null

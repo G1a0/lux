@@ -1367,6 +1367,10 @@ export interface AramJudgeInput {
   current: number
   bench: number[]
   diceLeft: number
+  /** 己方已选英雄 id（大乱斗选人可见）；缺省 = 未知（阵容契合按中性计） */
+  allies?: number[]
+  /** 敌方可见英雄 id；缺省 = 未知 */
+  enemies?: number[]
 }
 
 export interface AramJudgeResult {
@@ -2046,7 +2050,7 @@ export function scoreComposition(championId: number, ctx: DraftContext, data: En
   if (enemyAssassins >= 2) {
     if (isFrontline(meta)) {
       deltas.push({ delta: d.tankyVsAssassins, text: `对面刺客多，${meta.name}扛得住` })
-    } else if (meta.difficulty >= 7) {
+    } else {
       deltas.push({ delta: d.squishyVsAssassins, text: '' })
     }
   }
@@ -2477,7 +2481,11 @@ export function scoreAramStrength(championId: number, data: EngineData): FactorO
 }
 
 export function judgeAram(input: AramJudgeInput, data: EngineData): AramJudgeResult {
-  const ctx: DraftContext = { queueId: 450, allies: [], enemies: [] }
+  const ctx: DraftContext = {
+    queueId: 450,
+    allies: (input.allies ?? []).map(championId => ({ championId })),
+    enemies: (input.enemies ?? []).map(championId => ({ championId })),
+  }
   const weights = WEIGHTS_BY_QUEUE[450]
 
   const scoreOf = (championId: number): ChampionRecommendation =>
@@ -2641,7 +2649,13 @@ if (scenario === 'rift') {
   console.log('=== 排位·中单 推荐 ===')
   console.log(JSON.stringify(advice, null, 2))
 } else {
-  const result = judgeAram({ current: 711, bench: [84, 57, 22], diceLeft: 2 }, data)
+  const result = judgeAram({
+    current: 711,
+    bench: [84, 57, 22],
+    diceLeft: 2,
+    allies: [90, 111, 22, 412],
+    enemies: [105, 64],
+  }, data)
   console.log('=== 大乱斗 换/留 判定 ===')
   console.log(JSON.stringify(result, null, 2))
 }

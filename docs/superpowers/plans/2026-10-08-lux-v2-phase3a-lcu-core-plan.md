@@ -1475,12 +1475,11 @@ beforeEach(async () => {
     certDir: CERT_DIR,
     routes: {
       '/lol-perks/v1/pages': {
-        handler: (body, req) => {
+        handler: (_body, req) => {
           if (req.method === 'POST') return { json: { id: 9001 } }
-          return { json: [{ id: 100, current: true, isDeletable: true, name: '旧页' }] }
+          return { json: [{ id: 100, current: true, isDeletable: true, name: '我的自定义页' }] }
         },
       },
-      '/lol-perks/v1/currentpage': { status: 200, json: {} },
       '/lol-champ-select/v1/session/my-selection': { status: 204 },
     },
   })
@@ -1499,10 +1498,10 @@ describe('subStyleCodeToStyleId', () => {
 })
 
 describe('applyRunePage', () => {
-  it('常规：POST 创建当前页', async () => {
+  it('常规：自动加 Lux· 前缀并 POST 创建当前页（不删用户页）', async () => {
     const http = createLcuHttp({ port: mock.port, password: mock.password })
     const ok = await applyRunePage(http, {
-      name: 'Lux·阿卡丽',
+      name: '阿卡丽',
       keystoneId: 8112,
       subStyleCode: 'jj',
       runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
@@ -1516,39 +1515,63 @@ describe('applyRunePage', () => {
       selectedPerkIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
       current: true,
     })
+    expect(mock.received.filter(r => r.method === 'DELETE')).toHaveLength(0)
   })
 
-  it('页数满（POST 失败）：删除当前可删页后重试成功', async () => {
+  it('创建前只清理本应用旧页（Lux· 前缀），用户自建页不动', async () => {
     await mock.stop()
-    let firstPost = true
     mock = await createMockLcu({
       certDir: CERT_DIR,
       routes: {
         '/lol-perks/v1/pages': {
           handler: (_body, req) => {
-            if (req.method === 'POST') {
-              if (firstPost) { firstPost = false; return { status: 500 } }
-              return { json: { id: 9002 } }
-            }
-            return { json: [{ id: 100, current: true, isDeletable: true, name: '旧页' }] }
+            if (req.method === 'POST') return { json: { id: 9002 } }
+            return { json: [
+              { id: 100, current: true, isDeletable: true, name: '我的自定义页' },
+              { id: 200, current: false, isDeletable: true, name: 'Lux·旧符文' },
+            ] }
           },
         },
-        '/lol-perks/v1/pages/100': { status: 204 },
+        '/lol-perks/v1/pages/200': { status: 204 },
       },
     })
     const http = createLcuHttp({ port: mock.port, password: mock.password })
     const ok = await applyRunePage(http, {
-      name: 'Lux·测试', keystoneId: 8112, subStyleCode: 'jj',
+      name: '测试', keystoneId: 8112, subStyleCode: 'jj',
       runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
     })
     expect(ok.ok).toBe(true)
-    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/100')).toBe(true)
+    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/200')).toBe(true)
+    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/100')).toBe(false)
+  })
+
+  it('POST 失败且无自建旧页 → 不删任何页，返回可读原因', async () => {
+    await mock.stop()
+    mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: {
+        '/lol-perks/v1/pages': {
+          handler: (_body, req) =>
+            req.method === 'POST'
+              ? { status: 500 }
+              : { json: [{ id: 100, current: true, isDeletable: true, name: '我的自定义页' }] },
+        },
+      },
+    })
+    const http = createLcuHttp({ port: mock.port, password: mock.password })
+    const result = await applyRunePage(http, {
+      name: '测试', keystoneId: 8112, subStyleCode: 'jj',
+      runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
+    })
+    expect(result.ok).toBe(false)
+    expect(result.reason).toContain('页数已满')
+    expect(mock.received.filter(r => r.method === 'DELETE')).toHaveLength(0)
   })
 
   it('副系未知 → 失败并带原因', async () => {
     const http = createLcuHttp({ port: mock.port, password: mock.password })
     const result = await applyRunePage(http, {
-      name: 'Lux·测试', keystoneId: 8112, subStyleCode: 'xx', runeIds: [8112],
+      name: '测试', keystoneId: 8112, subStyleCode: 'xx', runeIds: [8112],
     })
     expect(result.ok).toBe(false)
     expect(result.reason).toContain('副系')
@@ -1601,6 +1624,7 @@ export function keystoneToPrimaryStyleId(keystoneId: number): number | null {
 }
 
 export interface RunePageInput {
+  /** 页面名（不含前缀；应用时自动加 `Lux·`） */
   name: string
   keystoneId: number
   subStyleCode: string
@@ -1619,6 +1643,9 @@ interface PerkPage {
   name?: string
 }
 
+/** 本应用创建的符文页前缀：清理时只删自己的旧页，绝不触碰用户自建页 */
+export const PAGE_NAME_PREFIX = 'Lux·'
+
 export async function applyRunePage(http: LcuHttp, page: RunePageInput): Promise<WriteResult> {
   const primaryStyleId = keystoneToPrimaryStyleId(page.keystoneId)
   if (primaryStyleId === null) return { ok: false, reason: '无法识别基石符文的主系' }
@@ -1627,28 +1654,27 @@ export async function applyRunePage(http: LcuHttp, page: RunePageInput): Promise
   if (page.runeIds.length < 6) return { ok: false, reason: '符文列表不完整' }
 
   const body = {
-    name: page.name.slice(0, 40),
+    name: `${PAGE_NAME_PREFIX}${page.name}`.slice(0, 40),
     primaryStyleId,
     subStyleId,
     selectedPerkIds: page.runeIds,
     current: true,
   }
 
+  // 保守清理：仅删除本应用此前创建的同前缀旧页（避免页数占满），失败不阻塞
+  try {
+    const pages = (await http.get<PerkPage[]>('/lol-perks/v1/pages')) ?? []
+    const own = pages.find(p => (p.name ?? '').startsWith(PAGE_NAME_PREFIX))
+    if (own) await http.del(`/lol-perks/v1/pages/${own.id}`)
+  } catch {
+    // 列页失败：直接尝试创建
+  }
+
   try {
     await http.post<{ id: number }>('/lol-perks/v1/pages', body)
     return { ok: true }
   } catch {
-    // 页数已满等：删除当前可删页后重试一次
-    try {
-      const pages = (await http.get<PerkPage[]>('/lol-perks/v1/pages')) ?? []
-      const target = pages.find(p => p.current && p.isDeletable !== false)
-      if (!target) return { ok: false, reason: '符文页创建失败（可能页数已满且无可用空位）' }
-      await http.del(`/lol-perks/v1/pages/${target.id}`)
-      await http.post<{ id: number }>('/lol-perks/v1/pages', body)
-      return { ok: true }
-    } catch {
-      return { ok: false, reason: '符文页创建失败，请手动在客户端设置' }
-    }
+    return { ok: false, reason: '符文页创建失败（可能页数已满），请手动在客户端设置' }
   }
 }
 
@@ -2046,7 +2072,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ action: result.action, reason: result.reason, runes: result.runes, spells: result.spells }, null, 2))
     if (shouldApply && result.runes) {
       const applied = await applyRunePage(http, {
-        name: `Lux·${result.action}`,
+        name: result.action, // 前缀由 applyRunePage 统一添加（Lux·）
         keystoneId: result.runes.keystoneId,
         subStyleCode: 'jj',
         runeIds: result.runes.runeIds,
@@ -2063,7 +2089,7 @@ async function main(): Promise<void> {
     console.log(JSON.stringify({ ruleMode: advice.ruleMode, primary: advice.primary, alternates: advice.alternates, runes: advice.runes, spells: advice.spells }, null, 2))
     if (shouldApply && advice.spells) {
       const applied = await applyRunePage(http, {
-        name: 'Lux·排位',
+        name: '排位', // 前缀由 applyRunePage 统一添加（Lux·）
         keystoneId: advice.runes?.keystoneId ?? 0,
         subStyleCode: 'jj',
         runeIds: advice.runes?.runeIds ?? [],

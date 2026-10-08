@@ -1,7 +1,7 @@
-import type { ChampSelectSession, SummonerInfo, LCUEventMessage, GameflowPhase } from '@/types/lcu'
+import type { ChampSelectSession, SummonerInfo, LCUEventMessage } from '@/types/lcu'
 import { LcuEventUri } from '@/types/lcu'
 
-type EventCallback = (event: LCUEventMessage) => void
+type EventCallback = (message: LCUEventMessage) => void
 
 class LCUManager {
   private eventListeners = new Map<string, Set<EventCallback>>()
@@ -18,8 +18,9 @@ class LCUManager {
   private observeUriOnSocket(uri: string) {
     if (!this.penguContext || this.observedUris.has(uri)) return
     this.observedUris.add(uri)
-    this.penguContext.socket.observe(uri, (data: unknown) => {
-      const message = data as LCUEventMessage
+    // Pengu 文档：socket.observe 的 listener 收到 { data, uri, eventType }
+    this.penguContext.socket.observe(uri, (raw: unknown) => {
+      const message = raw as LCUEventMessage
       this.eventListeners.get(uri)?.forEach(cb => cb(message))
     })
   }
@@ -68,4 +69,4 @@ class LCUManager {
 
 export const lcu = new LCUManager()
 export { LcuEventUri }
-export type { LCUEventMessage, GameflowPhase, ChampSelectSession }
+export type { ChampSelectSession, LCUEventMessage }

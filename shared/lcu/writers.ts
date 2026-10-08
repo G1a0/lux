@@ -23,6 +23,7 @@ export function keystoneToPrimaryStyleId(keystoneId: number): number | null {
 }
 
 export interface RunePageInput {
+  /** 页面名（不含前缀；应用时自动加 `Lux·`） */
   name: string
   keystoneId: number
   subStyleCode: string
@@ -41,6 +42,9 @@ interface PerkPage {
   name?: string
 }
 
+/** 本应用创建的符文页前缀：清理时只删自己的旧页，绝不触碰用户自建页 */
+export const PAGE_NAME_PREFIX = 'Lux·'
+
 export async function applyRunePage(http: LcuHttp, page: RunePageInput): Promise<WriteResult> {
   const primaryStyleId = keystoneToPrimaryStyleId(page.keystoneId)
   if (primaryStyleId === null) return { ok: false, reason: '无法识别基石符文的主系' }
@@ -49,28 +53,27 @@ export async function applyRunePage(http: LcuHttp, page: RunePageInput): Promise
   if (page.runeIds.length < 6) return { ok: false, reason: '符文列表不完整' }
 
   const body = {
-    name: page.name.slice(0, 40),
+    name: `${PAGE_NAME_PREFIX}${page.name}`.slice(0, 40),
     primaryStyleId,
     subStyleId,
     selectedPerkIds: page.runeIds,
     current: true,
   }
 
+  // 保守清理：仅删除本应用此前创建的同前缀旧页（避免页数占满），失败不阻塞
+  try {
+    const pages = (await http.get<PerkPage[]>('/lol-perks/v1/pages')) ?? []
+    const own = pages.find(p => (p.name ?? '').startsWith(PAGE_NAME_PREFIX))
+    if (own) await http.del(`/lol-perks/v1/pages/${own.id}`)
+  } catch {
+    // 列页失败：直接尝试创建
+  }
+
   try {
     await http.post<{ id: number }>('/lol-perks/v1/pages', body)
     return { ok: true }
   } catch {
-    // 页数已满等：删除当前可删页后重试一次
-    try {
-      const pages = (await http.get<PerkPage[]>('/lol-perks/v1/pages')) ?? []
-      const target = pages.find(p => p.current && p.isDeletable !== false)
-      if (!target) return { ok: false, reason: '符文页创建失败（可能页数已满且无可用空位）' }
-      await http.del(`/lol-perks/v1/pages/${target.id}`)
-      await http.post<{ id: number }>('/lol-perks/v1/pages', body)
-      return { ok: true }
-    } catch {
-      return { ok: false, reason: '符文页创建失败，请手动在客户端设置' }
-    }
+    return { ok: false, reason: '符文页创建失败（可能页数已满），请手动在客户端设置' }
   }
 }
 

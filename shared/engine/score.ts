@@ -146,7 +146,7 @@ export function scoreComposition(championId: number, ctx: DraftContext, data: En
   if (enemyAssassins >= 2) {
     if (isFrontline(meta)) {
       deltas.push({ delta: d.tankyVsAssassins, text: `对面刺客多，${meta.name}扛得住` })
-    } else if (meta.difficulty >= 7) {
+    } else {
       deltas.push({ delta: d.squishyVsAssassins, text: '' })
     }
   }

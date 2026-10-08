@@ -71,6 +71,10 @@ export interface AramJudgeInput {
   current: number
   bench: number[]
   diceLeft: number
+  /** 己方已选英雄 id（大乱斗选人可见）；缺省 = 未知（阵容契合按中性计） */
+  allies?: number[]
+  /** 敌方可见英雄 id；缺省 = 未知 */
+  enemies?: number[]
 }
 
 export interface AramJudgeResult {

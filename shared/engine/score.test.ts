@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { scoreBeginner, scoreChampion, scoreComposition, scoreMatchup, scoreStrength, scoreSynergy } from './score'
+import { scoreAll, scoreBeginner, scoreChampion, scoreComposition, scoreMatchup, scoreStrength, scoreSynergy } from './score'
+import { RULE_MODE_WEIGHTS } from './config'
 import type { EngineData } from './data'
 import type { DraftContext } from './types'
 import type { Qq101TierList } from '../qq101/types'
@@ -156,5 +157,83 @@ describe('scoreChampion', () => {
     const keys = rec.factors.map(f => f.key).sort()
     expect(keys).toEqual(['beginner', 'composition', 'matchup', 'strength', 'synergy'])
     expect(rec.dominantFactor).toBe('strength') // 25 > matchup 19.5
+  })
+})
+
+describe('选项语义与阵容规则（审查补充）', () => {
+  it('显式 null 关闭强度/对位/协同；undefined 由 myPosition 推导', () => {
+    const data = makeData({
+      tierList: () => TIER,
+      matchups: () => [{ championId: 69, winRate: 0.56, favorable: true }],
+      synergies: () => [{ championId: 876, winRate: 0.58, games: 10 }],
+    })
+    const ctx: DraftContext = {
+      queueId: 420, myPosition: 'mid',
+      allies: [{ championId: 876 }], enemies: [{ championId: 69, position: 'mid' }],
+    }
+    const derived = scoreChampion(84, ctx, data, { modeLabel: '排位' })
+    expect(derived.factors.find(f => f.key === 'strength')!.score).not.toBeNull()
+    expect(derived.factors.find(f => f.key === 'matchup')!.score).not.toBeNull()
+    expect(derived.factors.find(f => f.key === 'synergy')!.score).not.toBeNull()
+
+    const disabled = scoreChampion(84, ctx, data, { modeLabel: '排位', strengthLane: null, pairLane: null })
+    expect(disabled.factors.find(f => f.key === 'strength')!.score).toBeNull()
+    expect(disabled.factors.find(f => f.key === 'matchup')!.score).toBeNull()
+    expect(disabled.factors.find(f => f.key === 'synergy')!.score).toBeNull()
+    expect(disabled.partialData).toBe(true)
+  })
+
+  it('规则模式权重下只激活阵容与新手，且不标记缺数据', () => {
+    const data = makeData({ tierList: () => TIER })
+    const rec = scoreChampion(112, BASE_CTX, data, {
+      modeLabel: '排位', weights: RULE_MODE_WEIGHTS, strengthLane: null, pairLane: null,
+    })
+    expect(rec.factors.map(f => f.key).sort()).toEqual(['beginner', 'composition'])
+    expect(rec.partialData).toBe(false)
+  })
+
+  it('strengthOverride 优先于 lane 强度；覆盖为 null 则强度缺数据', () => {
+    const data = makeData({ tierList: () => TIER })
+    const over = scoreChampion(84, BASE_CTX, data, {
+      modeLabel: '大乱斗', strengthLane: 'MIDDLE', pairLane: null,
+      strengthOverride: { score: 70, detail: { kind: 'strength', winRate: 0.54, tier: '' } },
+    })
+    expect(over.factors.find(f => f.key === 'strength')!.score).toBe(70)
+    expect(over.reason).toContain('大乱斗')
+    const nulled = scoreChampion(84, BASE_CTX, data, {
+      modeLabel: '大乱斗', strengthLane: 'MIDDLE', pairLane: null, strengthOverride: { score: null },
+    })
+    expect(nulled.factors.find(f => f.key === 'strength')!.score).toBeNull()
+  })
+
+  it('对面刺客 ≥2：非前排英雄减分（标签口径，与难度无关）', () => {
+    const data = makeData()
+    const r = scoreComposition(112, {
+      ...BASE_CTX, allies: [{ championId: 57 }], enemies: [{ championId: 84 }, { championId: 105 }],
+    }, data)
+    expect(r.score).toBe(40)
+  })
+
+  it('敌方无位置信息时对位取全体敌人平均（经 scoreChampion）', () => {
+    const data = makeData({
+      tierList: () => TIER,
+      matchups: () => [
+        { championId: 69, winRate: 0.56, favorable: true },
+        { championId: 711, winRate: 0.44, favorable: false },
+      ],
+    })
+    const ctx: DraftContext = { queueId: 420, myPosition: 'mid', allies: [], enemies: [{ championId: 69 }, { championId: 711 }] }
+    const rec = scoreChampion(84, ctx, data, { modeLabel: '排位' })
+    const matchup = rec.factors.find(f => f.key === 'matchup')!
+    expect(matchup.score).toBeCloseTo(50, 1)
+    expect(matchup.detail?.kind).toBe('matchup')
+  })
+
+  it('scoreAll 按总分降序排列', () => {
+    const data = makeData({ tierList: () => TIER })
+    const ranked = scoreAll([711, 84, 112], BASE_CTX, data, { modeLabel: '排位' })
+    expect(ranked.map(r => r.championId)[0]).toBe(84)
+    const scores = ranked.map(r => r.score)
+    expect(scores).toEqual([...scores].sort((a, b) => b - a))
   })
 })

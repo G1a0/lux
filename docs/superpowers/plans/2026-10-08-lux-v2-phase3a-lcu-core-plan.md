@@ -98,8 +98,9 @@ Expected: FAIL（模块不存在）
 - [ ] **Step 3: 实现 `shared/lcu/lockfile.ts`**
 
 ```ts
-// LCU lockfile：定位与解析。真实路径候选覆盖国服/国际服常见安装位置；
-// 测试与 mock 用 LUX_LCU_DIR 覆盖。
+// LCU lockfile：定位与解析。真实路径候选覆盖国服/国际服常见安装位置
+// （国服 WeGame 实测路径：D:\WeGameApps\英雄联盟\LeagueClient 含 lockfile）；
+// 调用方可通过 envDir 选项覆盖（测试 / 非默认安装 / dev CLI）。
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -126,14 +127,17 @@ export function parseLockfile(content: string): LcuLockfile | null {
   if (fields.length !== 5) return null
   const pid = Number(fields[1])
   const port = Number(fields[2])
-  if (!Number.isInteger(pid) || !Number.isInteger(port) || port <= 0) return null
+  if (!Number.isInteger(pid) || pid <= 0) return null
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) return null
   if (!fields[3]) return null
+  const protocol = fields[4] || 'https'
+  if (protocol !== 'http' && protocol !== 'https') return null // 撕裂读/异常内容不容错
   return {
     processName: fields[0],
     pid,
     port,
     password: fields[3],
-    protocol: fields[4] || 'https',
+    protocol,
   }
 }
 
@@ -1654,6 +1658,7 @@ git commit -m "feat: add rune page and summoner spell writers"
 
 **Files:**
 - Create: `shared/lcu/advisor.ts`
+- Modify: `shared/lcu/mock/server.ts`（新增 `stopServing()`：停止对外服务但保留 lockfile 目录，用于自愈测试）
 - Test: `shared/lcu/advisor.test.ts`
 
 - [ ] **Step 1: 写失败测试 `shared/lcu/advisor.test.ts`**
@@ -1735,6 +1740,30 @@ describe('LcuAdvisor', () => {
     await waitFor(() => (statuses.includes('in-champ-select') ? true : null))
     advisor.stop()
   })
+
+  it('服务中断但 lockfile 仍在（客户端崩溃残留）→ 连续失败后自愈回等待态', async () => {
+    const mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: { '/lol-champ-select/v1/session': { json: fixture('session-draft-mid.json') } },
+    })
+    servers.push(mock)
+
+    const statuses: string[] = []
+    const advisor = createLcuAdvisor({
+      lcuDirOverride: mock.lcuDir,
+      discoverIntervalMs: 30,
+      debounceMs: 10,
+      compute: session => ({ kind: 'rift', sessionQueueId: session.queueId }),
+    })
+    advisor.onStatus(s => statuses.push(s))
+    advisor.start()
+    await waitFor(() => (statuses.includes('in-champ-select') ? true : null))
+
+    await mock.stopServing() // 停服务但保留 lockfile（模拟崩溃残留）
+    await waitFor(() => (statuses.at(-1) === 'waiting' ? true : null), 5000)
+    expect(statuses.at(-1)).toBe('waiting') // 连续请求失败 ≥3 → 断开自愈
+    advisor.stop()
+  })
 })
 ```
 
@@ -1744,6 +1773,8 @@ Run: `npx vitest run shared/lcu/advisor.test.ts`
 Expected: FAIL（模块不存在）
 
 - [ ] **Step 3: 实现 `shared/lcu/advisor.ts`**
+
+先给 mock 增加 `stopServing()`（`shared/lcu/mock/server.ts`）：`MockLcu` 接口加 `stopServing(): Promise<void>`，实现为 `wss.close()` + `server.close()` 但**不**删除 `lcuDir`；`stop()` 则先 `stopServing()` 再 `rmSync(lcuDir)`。
 
 ```ts
 // 编排：发现 lockfile → 连接（REST+WSS）→ 会话存在时防抖重算 → 回调建议；
@@ -1796,6 +1827,7 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let status: AdvisorStatus = 'waiting'
   let running = false
+  let consecutiveFailures = 0
 
   const adviceHandlers = new Set<(snapshot: AdviceSnapshot) => void>()
   const statusHandlers = new Set<(status: AdvisorStatus) => void>()
@@ -1806,9 +1838,28 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     statusHandlers.forEach(h => h(next))
   }
 
+  /** 断开并回到等待态（客户端退出/崩溃自愈路径；下个 tick 会重扫 lockfile） */
+  function disconnect(): void {
+    socket?.close()
+    socket = null
+    http = null
+    readers = null
+    consecutiveFailures = 0
+    setStatus('waiting')
+  }
+
   async function evaluate(): Promise<void> {
     if (!readers) return
-    const session = await readers.getChampSelectSession().catch(() => null)
+    let session: ChampSelectSession | null
+    try {
+      session = await readers.getChampSelectSession()
+      consecutiveFailures = 0
+    } catch {
+      // 客户端崩溃/重启常见于 lockfile 残留：连续失败即断开重扫（密码/端口已变）
+      consecutiveFailures += 1
+      if (consecutiveFailures >= 3) disconnect()
+      return
+    }
     if (!session) {
       setStatus('connected')
       return
@@ -1856,11 +1907,10 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
           // 客户端可能已退出：lockfile 消失 → 断开重等
           const still = discoverLockfile({ envDir: lcuDir })
           if (!still) {
-            socket?.close()
-            socket = null
-            http = null
-            readers = null
-            setStatus('waiting')
+            disconnect()
+          } else {
+            // 周期性刷新（补事件丢失）+ 失败计数由 evaluate 内部自愈
+            scheduleEvaluate()
           }
         }
       }, discoverIntervalMs)
@@ -1869,11 +1919,7 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
       running = false
       if (discoverTimer) clearInterval(discoverTimer)
       if (debounceTimer) clearTimeout(debounceTimer)
-      socket?.close()
-      socket = null
-      http = null
-      readers = null
-      setStatus('waiting')
+      disconnect()
     },
     onAdvice(handler) {
       adviceHandlers.add(handler)

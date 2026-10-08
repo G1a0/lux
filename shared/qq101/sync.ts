@@ -93,7 +93,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
   for (const lane of lanes) {
     try {
       const tier = await client.getTierList(patch, lane)
-      if (!tier) {
+      if (!tier || tier.champions.length === 0) {
         anythingFailed = true
         continue
       }
@@ -134,7 +134,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
     try {
       if (job.need !== 'synergies') {
         const rows = await client.getMatchups(patch!, job.lane, job.championId)
-        if (rows) {
+        if (rows && rows.length > 0) {
           warehouse.saveMatchups(patch!, job.lane, job.championId, rows)
           result.matchups.fetched++
         } else {
@@ -144,7 +144,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
       }
       if (job.need !== 'matchups') {
         const rows = await client.getSynergies(patch!, job.lane, job.championId)
-        if (rows) {
+        if (rows && rows.length > 0) {
           warehouse.saveSynergies(patch!, job.lane, job.championId, rows)
           result.synergies.fetched++
         } else {
@@ -166,8 +166,8 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
     return result
   }
 
-  // 4) 完成才写 manifest
-  warehouse.writeManifest({ patch, dataDate, updatedAt: now().toISOString() })
+  // 4) 完成才写 manifest；无数据日期（上游异常/全空）不写，避免误报 up-to-date
+  if (dataDate) warehouse.writeManifest({ patch, dataDate, updatedAt: now().toISOString() })
 
   const nothingToDo = samePatch && dateUnchanged && total === 0
   result.status = anythingFailed ? 'partial' : nothingToDo ? 'up-to-date' : 'synced'

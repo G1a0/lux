@@ -29,6 +29,7 @@ describe('createQq101Client', () => {
     expect(tier!.champions.length).toBeGreaterThan(100)
     expect(calls[0]).toContain('lane=ALL')
     expect(calls[0]).toContain('version_id=16.19')
+    expect(calls[0]).toContain('sort_metric=1')
   })
 
   it('getMatchups / getSynergies 构造 championid 参数', async () => {

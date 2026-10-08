@@ -23,13 +23,14 @@ function fakeTier(lane: Qq101Lane, date = '2026-10-08'): Qq101TierList {
   }
 }
 
-function createFakeClient(opts: { failChampions?: number[]; blockAfter?: number } = {}) {
+function createFakeClient(opts: { failChampions?: number[]; blockAfter?: number; emptyTier?: boolean } = {}) {
   const calls: FakeCall[] = []
   let remaining = opts.blockAfter ?? Infinity
   const client: Qq101Client = {
     async getPatch() { return '16.19' },
     async getTierList(_patch, lane) {
       calls.push({ kind: 'tier', lane: lane as Qq101Lane })
+      if (opts.emptyTier) return { date: '', champions: [] }
       return fakeTier(lane as Qq101Lane)
     },
     async getMatchups(_patch, lane, championId): Promise<Qq101Matchup[] | null> {
@@ -105,5 +106,12 @@ describe('syncRiftData', () => {
     const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
     expect(result.status).toBe('blocked')
     expect(wh.readManifest()).toBeNull() // 未完成不写 manifest
+  })
+
+  it('上游 tier 为空（如缺必填参数）→ partial，且不写 manifest', async () => {
+    const { client } = createFakeClient({ emptyTier: true })
+    const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
+    expect(result.status).toBe('partial')
+    expect(wh.readManifest()).toBeNull()
   })
 })

@@ -13,12 +13,14 @@ export function riftUrl(
   patch: string,
   lane: Qq101Lane | 'ALL',
   championId?: number,
+  extraParams?: Record<string, string>,
 ): string {
   const params = new URLSearchParams({
     itier: String(ALL_TIERS),
     version_id: patch,
     lane,
     ...(championId === undefined ? {} : { championid: String(championId) }),
+    ...extraParams,
   })
   return `${QQ101_ORIGIN}${path}?${params.toString()}`
 }

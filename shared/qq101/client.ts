@@ -76,7 +76,11 @@ export function createQq101Client(options: CreateQq101ClientOptions = {}): Qq101
       cachedPatch = versions[0]
       return cachedPatch
     },
-    getTierList: (patch, lane) => request(riftUrl(RIFT_PATH, patch, lane), parseQq101TierList),
+    getTierList: (patch, lane) =>
+      request(
+        riftUrl(RIFT_PATH, patch, lane, undefined, { sort_metric: '1', sort_order: '2' }),
+        parseQq101TierList,
+      ),
     getMatchups: (patch, lane, championId) =>
       request(riftUrl(`${RIFT_PATH}_confront`, patch, lane, championId), parseQq101Matchups),
     getSynergies: (patch, lane, championId) =>

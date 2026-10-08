@@ -90,4 +90,11 @@ describe('buildCandidatePool', () => {
     const pool = buildCandidatePool(ctx(430), data)
     expect(pool).toEqual([84, 112])
   })
+
+  it('剔除我已锁定的英雄（myChampionId）', () => {
+    const data = makeData({ tierList: () => TIER })
+    const pool = buildCandidatePool(ctx(420, { myPosition: 'mid', myChampionId: 84 }), data)
+    expect(pool).not.toContain(84)
+    expect(pool).toContain(112)
+  })
 })

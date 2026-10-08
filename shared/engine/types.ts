@@ -10,6 +10,8 @@ export interface ChampPick {
 export interface DraftContext {
   queueId: QueueId
   myPosition?: InternalPosition
+  /** 我已锁定/已选中的英雄（来自 LCU）；候选池据此排除 */
+  myChampionId?: number
   allies: ChampPick[]
   enemies: ChampPick[]
   bans?: number[]

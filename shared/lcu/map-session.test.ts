@@ -46,4 +46,11 @@ describe('mapRiftContext', () => {
     const ctx = mapRiftContext(fixture('session-draft-mid.json'), { proficiency: { 84: 23 } })
     expect(ctx!.proficiency).toEqual({ 84: 23 })
   })
+
+  it('我已锁定的英雄暴露为 myChampionId（引擎候选池据此排除）', () => {
+    const session = fixture('session-draft-mid.json')
+    expect(mapRiftContext(session)!.myChampionId).toBeUndefined() // 未选时为 undefined
+    session.myTeam[1].championId = 84
+    expect(mapRiftContext(session)!.myChampionId).toBe(84)
+  })
 })

@@ -16,6 +16,7 @@ export function buildCandidatePool(ctx: DraftContext, data: EngineData): number[
     ...ctx.allies.map(p => p.championId),
     ...ctx.enemies.map(p => p.championId),
     ...(ctx.bans ?? []),
+    ...(ctx.myChampionId === undefined ? [] : [ctx.myChampionId]),
   ])
 
   let pool = base.filter(id => !exclude.has(id))

@@ -34,6 +34,8 @@ export function mapRiftContext(session: ChampSelectSession, extras: MapExtras = 
 
   return {
     queueId: session.queueId as DraftContext['queueId'],
+    // 我已锁定/已选中的英雄：引擎候选池必须排除，避免"推荐我已选的英雄"并对其误写符文
+    myChampionId: me.championId > 0 ? me.championId : undefined,
     myPosition: myPosition || undefined,
     allies,
     enemies,

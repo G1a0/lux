@@ -41,6 +41,7 @@ export async function buildChampionIndex(http: LcuHttp, concurrency = 8): Promis
 
   const metas: ChampionMeta[] = []
   let cursor = 0
+  let detailFailures = 0
   async function worker(): Promise<void> {
     while (cursor < entries.length) {
       const entry = entries[cursor++]
@@ -49,6 +50,7 @@ export async function buildChampionIndex(http: LcuHttp, concurrency = 8): Promis
         detail = await http.get<ChampionDetail>(`/lol-game-data/assets/v1/champions/${entry.id}.json`)
       } catch {
         detail = null // 单个英雄失败不阻塞（404/超时 → 兜底）
+        detailFailures += 1
       }
       const roles = toRoles(detail?.roles ?? entry.roles)
       metas.push({
@@ -61,6 +63,11 @@ export async function buildChampionIndex(http: LcuHttp, concurrency = 8): Promis
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, entries.length) }, worker))
+
+  if (entries.length > 0 && detailFailures === entries.length) {
+    // 全套详情获取失败（资源路径变更等）：伤害/难度全部走兜底，给一次可观测信号
+    console.warn('[lcu] champion detail 资源全部获取失败，伤害/难度使用兜底值')
+  }
 
   return createChampionIndex(metas)
 }

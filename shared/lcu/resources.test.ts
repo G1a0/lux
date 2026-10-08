@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMockLcu, type MockLcu } from './mock/server'
 import { createLcuHttp } from './http'
 import { buildChampionIndex } from './resources'
@@ -31,5 +31,22 @@ describe('buildChampionIndex', () => {
     expect(index.get(22)?.roles).toEqual(['marksman', 'support'])
     expect(index.get(9999)).toBeNull()
     expect(index.all().length).toBe(5)
+  })
+
+  it('详情资源全部失败 → 兜底索引 + 一次告警', async () => {
+    await mock.stop()
+    mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: { '/lol-game-data/assets/v1/champion-summary.json': { json: fixture('champion-summary.json') } },
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      const index = await buildChampionIndex(createLcuHttp({ port: mock.port, password: mock.password }))
+      expect(index.all()).toHaveLength(5)
+      expect(index.get(84)?.damageType).toBe('mixed')
+      expect(warn).toHaveBeenCalledTimes(1)
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

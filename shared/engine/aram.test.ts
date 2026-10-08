@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { judgeAram } from './aram'
 import { createChampionIndex } from '../champions/meta'
+import { ARAM_RULES } from '../champions/aram-rules'
 import type { EngineData } from './data'
 import type { Qq101AramHero } from '../qq101/types'
 
@@ -9,6 +10,7 @@ const INDEX = createChampionIndex([
   { id: 112, name: '维克托', damageType: 'ap', roles: ['mage'], difficulty: 5 },
   { id: 57, name: '茂凯', damageType: 'ap', roles: ['tank'], difficulty: 3 },
   { id: 711, name: '薇克丝', damageType: 'ap', roles: ['mage'], difficulty: 4 },
+  { id: 22, name: '艾希', damageType: 'ad', roles: ['marksman'], difficulty: 4 },
 ])
 
 function aramHero(championId: number, winRate: number): Qq101AramHero {
@@ -53,6 +55,7 @@ describe('judgeAram', () => {
     expect(r.action).toBe('keep')
     expect(r.swapTo).toBeNull()
     expect(r.reason).toContain('留着')
+    expect(r.reason).toContain('手里最好')
   })
 
   it('全员弱且有骰子 → 掷骰子', () => {
@@ -70,11 +73,38 @@ describe('judgeAram', () => {
     })
     const r = judgeAram({ current: 84, bench: [711], diceLeft: 0 }, weak)
     expect(r.action).toBe('keep')
+    expect(r.reason).toContain('差距不大')
   })
 
   it('无大乱斗榜单数据也能工作（中性强度），符文仍来自内置规则', () => {
     const r = judgeAram({ current: 84, bench: [112], diceLeft: 0 }, makeData({ aramOverview: () => null }))
     expect(r.action).toBe('keep')
     expect(r.runes?.source).toBe('builtin')
+    expect(r.current.partialData).toBe(true)
+  })
+
+  it('阵容输入映射进评分上下文（缺法术伤害文案可见）', () => {
+    const r = judgeAram({ current: 84, bench: [], diceLeft: 0, allies: [22], enemies: [] }, makeData())
+    const composition = r.current.factors.find(f => f.key === 'composition')!
+    expect(composition.detail).toEqual({ kind: 'composition', text: '你们缺法术伤害，阿卡丽正好补上' })
+  })
+
+  it('空备战席：弱且有骰子 → 掷骰子；无骰子 → 留着', () => {
+    const withDice = judgeAram({ current: 711, bench: [], diceLeft: 1 }, makeData())
+    expect(withDice.action).toBe('reroll')
+    const noDice = judgeAram({ current: 711, bench: [], diceLeft: 0 }, makeData())
+    expect(noDice.action).toBe('keep')
+  })
+
+  it('返回的符文/技能是副本，修改不影响规则表', () => {
+    const r = judgeAram({ current: 84, bench: [], diceLeft: 0 }, makeData())
+    r.runes!.runeIds[0] = 9999
+    expect(ARAM_RULES.assassin.runeIds[0]).toBe(8112)
+  })
+
+  it('备战席按评分降序返回', () => {
+    const r = judgeAram({ current: 711, bench: [57, 84, 112], diceLeft: 0 }, makeData())
+    const scores = r.bench.map(b => b.score)
+    expect(scores).toEqual([...scores].sort((a, b) => b - a))
   })
 })

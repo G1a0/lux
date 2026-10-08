@@ -60,12 +60,15 @@ export function judgeAram(input: AramJudgeInput, data: EngineData): AramJudgeRes
   const rule = aramRuleFor(chosenId, index)
 
   const nameOf = (id: number): string => data.champion(id)?.name ?? `英雄${id}`
+  // swap 优先于 reroll（设计 §5.3 的顺序）；留着的两种口径：当前最优 / 替补略强但差距小于阈值
   const reason =
     action === 'swap' && swapTo
       ? `建议换 ${nameOf(swapTo.championId)}：${swapTo.reason}`
       : action === 'reroll'
         ? '手里英雄都不强，建议掷骰子'
-        : `留着 ${nameOf(current.championId)}：手里最好`
+        : !bestBench || bestBench.score <= current.score
+          ? `留着 ${nameOf(current.championId)}：手里最好`
+          : `留着 ${nameOf(current.championId)}：差距不大，先留着`
 
   return {
     action,

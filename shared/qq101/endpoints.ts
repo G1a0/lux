@@ -24,3 +24,19 @@ export function riftUrl(
   })
   return `${QQ101_ORIGIN}${path}?${params.toString()}`
 }
+
+export const ARAM_OVERVIEW_PATH = '/go/battle_info/odp_proxy/aram_hero_overview'
+
+export function aramOverviewUrl(dtstatdate: string): string {
+  const params = new URLSearchParams({ dtstatdate })
+  return `${QQ101_ORIGIN}${ARAM_OVERVIEW_PATH}?${params.toString()}`
+}
+
+/** 大乱斗榜单取「前一天」的日期串（YYYYMMDD，本地时区） */
+export function aramDateString(now: Date): string {
+  const d = new Date(now)
+  d.setDate(d.getDate() - 1)
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}${m}${day}`
+}

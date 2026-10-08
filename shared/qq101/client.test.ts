@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ApiTimeBlockedError, createQq101Client } from './client'
+import { aramDateString } from './endpoints'
 import tierlistFixture from './fixtures/tierlist-all.json'
 import confrontFixture from './fixtures/confront-84-middle.json'
 import partnerFixture from './fixtures/partner-84-middle.json'
 import versionlistFixture from './fixtures/versionlist.json'
+import runeinfoFixture from './fixtures/recon-runeinfo-84-mid-20261008.json'
+import skillFixture from './fixtures/recon-skill-84-mid-20261008.json'
+import aramFixture from './fixtures/recon-aram-hero-overview-20261008.json'
 
 function okFetch(payload: unknown, calls: string[]) {
   return vi.fn(async (input: Parameters<typeof fetch>[0]) => {
@@ -82,5 +86,41 @@ describe('createQq101Client', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('extended endpoints', () => {
+  it('getRunePages 请求 runeinfo 路径与 championid', async () => {
+    const calls: string[] = []
+    const client = createQq101Client({ fetchImpl: okFetch(runeinfoFixture, calls) })
+    const pages = await client.getRunePages('16.19', 'MIDDLE', 84)
+    expect(pages![0].keystoneId).toBe(8112)
+    expect(calls[0]).toContain('lol_101strategy_runeinfo')
+    expect(calls[0]).toContain('championid=84')
+    expect(calls[0]).toContain('lane=MIDDLE')
+  })
+
+  it('getSpellCombos 请求 skill 路径', async () => {
+    const calls: string[] = []
+    const client = createQq101Client({ fetchImpl: okFetch(skillFixture, calls) })
+    const combos = await client.getSpellCombos('16.19', 'MIDDLE', 84)
+    expect(combos![0].pickRate).toBeCloseTo(0.906, 4)
+    expect(calls[0]).toContain('lol_101strategy_skill?')
+  })
+
+  it('getAramOverview 请求 dtstatdate 参数', async () => {
+    const calls: string[] = []
+    const client = createQq101Client({ fetchImpl: okFetch(aramFixture, calls) })
+    const heroes = await client.getAramOverview('20261007')
+    expect(heroes).toHaveLength(173)
+    expect(calls[0]).toContain('aram_hero_overview')
+    expect(calls[0]).toContain('dtstatdate=20261007')
+  })
+})
+
+describe('aramDateString', () => {
+  it('返回前一天的 YYYYMMDD（含跨月）', () => {
+    expect(aramDateString(new Date(2026, 9, 8))).toBe('20261007')
+    expect(aramDateString(new Date(2026, 10, 1))).toBe('20261031')
   })
 })

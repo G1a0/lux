@@ -2,9 +2,24 @@
 // 时段禁止时抛 ApiTimeBlockedError（绝不静默吞掉）；其他网络错误返回 null。
 import { isApiAllowed } from '../timegate'
 import type { Qq101Lane } from '../positions'
-import { RIFT_PATH, riftUrl, versionsUrl } from './endpoints'
-import { parseQq101Matchups, parseQq101Synergies, parseQq101TierList, parseQq101Versions } from './parse'
-import type { Qq101Matchup, Qq101Synergy, Qq101TierList } from './types'
+import { aramOverviewUrl, RIFT_PATH, riftUrl, versionsUrl } from './endpoints'
+import {
+  parseQq101AramOverview,
+  parseQq101Matchups,
+  parseQq101RunePages,
+  parseQq101SpellCombos,
+  parseQq101Synergies,
+  parseQq101TierList,
+  parseQq101Versions,
+} from './parse'
+import type {
+  Qq101AramHero,
+  Qq101Matchup,
+  Qq101RunePage,
+  Qq101SpellCombo,
+  Qq101Synergy,
+  Qq101TierList,
+} from './types'
 
 export class ApiTimeBlockedError extends Error {
   constructor(now: Date) {
@@ -18,6 +33,9 @@ export interface Qq101Client {
   getTierList(patch: string, lane: Qq101Lane | 'ALL'): Promise<Qq101TierList | null>
   getMatchups(patch: string, lane: Qq101Lane, championId: number): Promise<Qq101Matchup[] | null>
   getSynergies(patch: string, lane: Qq101Lane, championId: number): Promise<Qq101Synergy[] | null>
+  getRunePages(patch: string, lane: Qq101Lane, championId: number): Promise<Qq101RunePage[] | null>
+  getSpellCombos(patch: string, lane: Qq101Lane, championId: number): Promise<Qq101SpellCombo[] | null>
+  getAramOverview(dtstatdate: string): Promise<Qq101AramHero[] | null>
 }
 
 export interface CreateQq101ClientOptions {
@@ -85,5 +103,11 @@ export function createQq101Client(options: CreateQq101ClientOptions = {}): Qq101
       request(riftUrl(`${RIFT_PATH}_confront`, patch, lane, championId), parseQq101Matchups),
     getSynergies: (patch, lane, championId) =>
       request(riftUrl(`${RIFT_PATH}_partner`, patch, lane, championId), parseQq101Synergies),
+    getRunePages: (patch, lane, championId) =>
+      request(riftUrl(`${RIFT_PATH}_runeinfo`, patch, lane, championId), parseQq101RunePages),
+    getSpellCombos: (patch, lane, championId) =>
+      request(riftUrl(`${RIFT_PATH}_skill`, patch, lane, championId), parseQq101SpellCombos),
+    getAramOverview: dtstatdate =>
+      request(aramOverviewUrl(dtstatdate), parseQq101AramOverview),
   }
 }

@@ -1133,7 +1133,16 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
   },
 }
 
-const PRIORITY: AramRuleKey[] = ['support', 'tank', 'assassin', 'mage', 'marksman', 'fighter']
+// 优先级：前排/开团优先（坦克→辅助），避免开团型辅助被路由到艾黎保护页；
+// 纯保护型辅助（仅 support 角色）不受影响。全员冻结，防止下游就地修改共享数组。
+const PRIORITY: AramRuleKey[] = ['tank', 'support', 'assassin', 'mage', 'marksman', 'fighter']
+
+Object.freeze(ARAM_RULES)
+for (const rule of Object.values(ARAM_RULES)) {
+  Object.freeze(rule.runeIds)
+  Object.freeze(rule.spellIds)
+  Object.freeze(rule)
+}
 
 export function aramRuleFor(championId: number, index: ChampionIndex): AramRule {
   const meta = index.get(championId)
@@ -2516,8 +2525,8 @@ export function judgeAram(input: AramJudgeInput, data: EngineData): AramJudgeRes
     bench,
     swapTo,
     reason,
-    runes: { keystoneId: rule.keystoneId, runeIds: rule.runeIds, source: 'builtin' },
-    spells: { spellIds: rule.spellIds, source: 'builtin' },
+    runes: { keystoneId: rule.keystoneId, runeIds: [...rule.runeIds], source: 'builtin' },
+    spells: { spellIds: [...rule.spellIds] as [number, number], source: 'builtin' },
   }
 }
 ```

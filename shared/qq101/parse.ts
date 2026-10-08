@@ -2,7 +2,14 @@
 // 记录格式: '#' 分隔记录、'_' 分隔字段、百分比为 0-100 数值
 
 import { fromQq101Position } from '../positions'
-import type { Qq101Matchup, Qq101Synergy, Qq101TierList } from './types'
+import type {
+  Qq101AramHero,
+  Qq101Matchup,
+  Qq101RunePage,
+  Qq101SpellCombo,
+  Qq101Synergy,
+  Qq101TierList,
+} from './types'
 
 function toNumber(value: string | undefined): number | null {
   if (value === undefined || value === '') return null
@@ -115,4 +122,89 @@ export function parseQq101Synergies(response: unknown): Qq101Synergy[] {
       games: toNumber(fields[3]),
     }]
   })
+}
+
+export function parseQq101RunePages(response: unknown): Qq101RunePage[] {
+  const payload = parseInner<{ rune_top_details?: string }>(response)
+  if (!payload) return []
+
+  const pages = splitRecords(payload.rune_top_details).flatMap(record => {
+    const fields = record.split('_')
+    if (fields.length < 7) return []
+    const rank = toNumber(fields[0])
+    const keystoneId = toNumber(fields[1])
+    if (rank === null || keystoneId === null) return []
+    return [{
+      rank,
+      keystoneId,
+      subStyleCode: (fields[2] ?? '').toLowerCase(),
+      runeIds: (fields[3] ?? '')
+        .split(',')
+        .map(id => toNumber(id))
+        .filter((id): id is number => id !== null),
+      pickRate: percentToRatio(fields[4]),
+      winRate: percentToRatio(fields[5]),
+      games: toNumber(fields[6]),
+    }]
+  })
+
+  return pages.sort((a, b) => a.rank - b.rank)
+}
+
+export function parseQq101SpellCombos(response: unknown): Qq101SpellCombo[] {
+  const payload = parseInner<{ data_details?: string }>(response)
+  if (!payload) return []
+
+  const combos = splitRecords(payload.data_details).flatMap(record => {
+    const fields = record.split('_')
+    if (fields.length < 4) return []
+    const a = toNumber(fields[0])
+    const b = toNumber(fields[1])
+    if (a === null || b === null) return []
+    return [{
+      spellIds: [a, b] as [number, number],
+      winRate: percentToRatio(fields[2]),
+      pickRate: percentToRatio(fields[3]),
+    }]
+  })
+
+  return combos.sort((a, b) => (b.pickRate ?? 0) - (a.pickRate ?? 0))
+}
+
+export function parseQq101AramOverview(response: unknown): Qq101AramHero[] {
+  const payload = parseInner<{ listcollect?: string }>(response)
+  if (!payload) return []
+
+  return (payload.listcollect ?? '')
+    .split(/[#|]/)
+    .filter(Boolean)
+    .flatMap(record => {
+      const fields = record.split('_')
+      const championId = toNumber(fields[0])
+      if (championId === null) return []
+      const bestPartners = (fields[5] ?? '').split('&').flatMap(entry => {
+        if (!entry) return []
+        const p = entry.split(',')
+        const partnerId = toNumber(p[0])
+        if (partnerId === null) return []
+        return [{
+          championId: partnerId,
+          pickRate: toNumber(p[1]),
+          winRate: toNumber(p[2]),
+          rank: toNumber(p[3]),
+        }]
+      })
+      return [{
+        championId,
+        rank: toNumber(fields[1]),
+        rankChange: fields[2] ?? '',
+        winRate: toNumber(fields[3]),
+        pickRate: toNumber(fields[4]),
+        bestPartners,
+        avgDeathTime: toNumber(fields[6]),
+        avgParticipation: toNumber(fields[7]),
+        avgDamageRatio: toNumber(fields[8]),
+        avgTankRatio: toNumber(fields[9]),
+      }]
+    })
 }

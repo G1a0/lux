@@ -1301,6 +1301,9 @@ git commit -m "feat: build champion index from lcu resources"
 
 **Files:**
 - Create: `shared/lcu/map-session.ts`
+- Modify: `shared/engine/types.ts`（`DraftContext` 增加可选 `myChampionId?: number`）
+- Modify: `shared/engine/candidates.ts`（候选池排除 `myChampionId`）
+- Modify: `shared/engine/candidates.test.ts`（+1 用例：已选英雄被排除）
 - Test: `shared/lcu/map-session.test.ts`
 
 - [ ] **Step 1: 写失败测试 `shared/lcu/map-session.test.ts`**
@@ -1354,6 +1357,13 @@ describe('mapRiftContext', () => {
     const ctx = mapRiftContext(fixture('session-draft-mid.json'), { proficiency: { 84: 23 } })
     expect(ctx!.proficiency).toEqual({ 84: 23 })
   })
+
+  it('我已锁定的英雄暴露为 myChampionId（引擎候选池据此排除）', () => {
+    const session = fixture('session-draft-mid.json')
+    expect(mapRiftContext(session)!.myChampionId).toBeUndefined() // 未选时为 undefined
+    session.myTeam[1].championId = 84
+    expect(mapRiftContext(session)!.myChampionId).toBe(84)
+  })
 })
 ```
 
@@ -1401,6 +1411,8 @@ export function mapRiftContext(session: ChampSelectSession, extras: MapExtras = 
 
   return {
     queueId: session.queueId as DraftContext['queueId'],
+    // 我已锁定/已选中的英雄：引擎候选池必须排除，避免"推荐我已选的英雄"并对其误写符文
+    myChampionId: me.championId > 0 ? me.championId : undefined,
     myPosition: myPosition || undefined,
     allies,
     enemies,

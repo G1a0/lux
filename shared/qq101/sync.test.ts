@@ -13,17 +13,23 @@ const CHAMPS = [84, 711, 876]
 
 interface FakeCall { kind: 'tier' | 'matchups' | 'synergies'; lane: Qq101Lane; championId?: number }
 
-function fakeTier(lane: Qq101Lane, date = '2026-10-08'): Qq101TierList {
+function fakeTier(championIds: number[], date = '2026-10-08'): Qq101TierList {
   return {
     date,
-    champions: CHAMPS.map((id, i) => ({
+    champions: championIds.map((id, i) => ({
       rank: i + 1, championId: id, strengthTier: 'T1', position: 'mid',
       winRate: 0.52, pickRate: 0.1, banRate: 0.05, counterChampionIds: [],
     })),
   }
 }
 
-function createFakeClient(opts: { failChampions?: number[]; blockAfter?: number; emptyTier?: boolean } = {}) {
+function createFakeClient(opts: {
+  failChampions?: number[]
+  blockAfter?: number
+  emptyTier?: boolean
+  failPairs?: boolean
+  champsByLane?: Partial<Record<Qq101Lane, number[]>>
+} = {}) {
   const calls: FakeCall[] = []
   let remaining = opts.blockAfter ?? Infinity
   const client: Qq101Client = {
@@ -31,18 +37,18 @@ function createFakeClient(opts: { failChampions?: number[]; blockAfter?: number;
     async getTierList(_patch, lane) {
       calls.push({ kind: 'tier', lane: lane as Qq101Lane })
       if (opts.emptyTier) return { date: '', champions: [] }
-      return fakeTier(lane as Qq101Lane)
+      return fakeTier(opts.champsByLane?.[lane as Qq101Lane] ?? CHAMPS)
     },
     async getMatchups(_patch, lane, championId): Promise<Qq101Matchup[] | null> {
       if (remaining-- <= 0) throw new ApiTimeBlockedError(new Date())
       calls.push({ kind: 'matchups', lane, championId })
-      if (opts.failChampions?.includes(championId)) return null
+      if (opts.failPairs || opts.failChampions?.includes(championId)) return null
       return [{ championId: 999, winRate: 0.55, favorable: true }]
     },
     async getSynergies(_patch, lane, championId): Promise<Qq101Synergy[] | null> {
       if (remaining-- <= 0) throw new ApiTimeBlockedError(new Date())
       calls.push({ kind: 'synergies', lane, championId })
-      if (opts.failChampions?.includes(championId)) return null
+      if (opts.failPairs || opts.failChampions?.includes(championId)) return null
       return [{ championId: 998, winRate: 0.58, games: 100 }]
     },
   }
@@ -113,5 +119,26 @@ describe('syncRiftData', () => {
     const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
     expect(result.status).toBe('partial')
     expect(wh.readManifest()).toBeNull()
+  })
+
+  it('对位/协同只按各位置自己的榜单英雄取数', async () => {
+    const { client, calls } = createFakeClient({ champsByLane: { MIDDLE: [84, 711], TOP: [122] } })
+    await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['TOP', 'MIDDLE'] })
+    const pairCalls = calls.filter(c => c.kind !== 'tier')
+    const topCalls = pairCalls.filter(c => c.lane === 'TOP').map(c => c.championId).sort((a, b) => a! - b!)
+    const midCalls = pairCalls.filter(c => c.lane === 'MIDDLE').map(c => c.championId).sort((a, b) => a! - b!)
+    expect(topCalls).toEqual([122, 122]) // 只发 122 的对位+协同，不发 MIDDLE 英雄的 TOP 数据
+    expect(midCalls).toEqual([84, 84, 711, 711])
+  })
+
+  it('连续失败达到阈值 → 熔断，不再发后续请求', async () => {
+    const { client, calls } = createFakeClient({ failPairs: true })
+    const result = await syncRiftData({
+      client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'],
+      abortAfterConsecutiveFailures: 1,
+    })
+    expect(result.status).toBe('partial')
+    // 无熔断时会有 3 对位 + 3 协同 = 6 个请求；熔断后最多只发出首批对位请求
+    expect(calls.filter(c => c.kind !== 'tier').length).toBeLessThanOrEqual(3)
   })
 })

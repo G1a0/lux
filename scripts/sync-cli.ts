@@ -1,5 +1,7 @@
 // 手工/定时跑同步：npx tsx scripts/sync-cli.ts --root ./data --lanes MIDDLE --limit 3
 // 禁窗内直接退出（exit 2），绝不发请求。
+// 全量同步默认放慢（间隔 500ms、并发 3），可用 --interval/--concurrency 覆盖；
+// 过快会被腾讯 WAF 限流（2026-10-08 全量 1.7k 突发请求触发过 501）。
 import { createQq101Client } from '../shared/qq101/client'
 import { syncRiftData, ALL_LANES } from '../shared/qq101/sync'
 import { createWarehouse } from '../shared/warehouse/store'
@@ -16,6 +18,8 @@ async function main(): Promise<void> {
   const lanesArg = arg('lanes')
   const lanes = (lanesArg ? lanesArg.split(',') : ALL_LANES) as Qq101Lane[]
   const limit = arg('limit') ? Number(arg('limit')) : undefined
+  const interval = arg('interval') ? Number(arg('interval')) : 500
+  const concurrency = arg('concurrency') ? Number(arg('concurrency')) : 3
 
   const now = new Date()
   console.log(`[sync] 当前时间：${now.toLocaleString()}（${['周日', '周一', '周二', '周三', '周四', '周五', '周六'][now.getDay()]}）`)
@@ -25,15 +29,16 @@ async function main(): Promise<void> {
     process.exit(2)
   }
 
-  const client = createQq101Client()
+  const client = createQq101Client({ minIntervalMs: interval })
   const warehouse = createWarehouse(root)
-  console.log(`[sync] 数据目录：${root}，位置：${lanes.join(',')}${limit ? `，每位置英雄上限：${limit}` : ''}`)
+  console.log(`[sync] 数据目录：${root}，位置：${lanes.join(',')}${limit ? `，每位置英雄上限：${limit}` : ''}（间隔 ${interval}ms，并发 ${concurrency}）`)
 
   const result = await syncRiftData({
     client,
     warehouse,
     lanes,
     championLimitPerLane: limit,
+    concurrency,
     onProgress: (done, total) => {
       if (total > 0 && (done === total || done % 20 === 0)) console.log(`[sync] 进度 ${done}/${total}`)
     },

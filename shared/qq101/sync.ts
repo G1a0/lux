@@ -26,6 +26,8 @@ export interface SyncOptions {
   lanes?: Qq101Lane[]
   championLimitPerLane?: number
   concurrency?: number
+  /** 连续失败达到该数量即停发后续请求（上游限流/WAF 熔断），默认 8 */
+  abortAfterConsecutiveFailures?: number
   onProgress?: (done: number, total: number) => void
 }
 
@@ -47,6 +49,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
   const lanes = options.lanes ?? ALL_LANES
   const limit = options.championLimitPerLane
   const concurrency = options.concurrency ?? 5
+  const abortAfter = options.abortAfterConsecutiveFailures ?? 8
 
   const result: SyncResult = {
     status: 'synced',
@@ -86,8 +89,8 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
   }
   result.patch = patch
 
-  // 2) tier（每次重刷；顺带确定数据日期与各位置英雄集合）
-  const championIds = new Set<number>()
+  // 2) tier（每次重刷；顺带确定数据日期与各位置的英雄集合）
+  const championsByLane = new Map<Qq101Lane, number[]>()
   let dataDate = ''
   let anythingFailed = false
   for (const lane of lanes) {
@@ -99,7 +102,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
       }
       warehouse.saveTier(patch, lane, tier)
       if (!dataDate && tier.date) dataDate = tier.date
-      for (const record of tier.champions) championIds.add(record.championId)
+      championsByLane.set(lane, tier.champions.map(record => record.championId))
     } catch (error) {
       catchBlocked(error)
       if (blocked) break
@@ -112,44 +115,54 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
   }
   result.dataDate = dataDate
 
-  // 3) 对位 / 协同（按存在性跳过）
-  const champs = [...championIds].slice(0, limit ?? championIds.size)
+  // 3) 对位 / 协同（只取「该位置榜单里的英雄」×该位置；按存在性跳过）
   const manifest = warehouse.readManifest()
   const samePatch = manifest?.patch === patch
   const dateUnchanged = manifest?.dataDate === dataDate
 
   const jobs: Array<{ lane: Qq101Lane; championId: number; need: 'both' | 'matchups' | 'synergies' }> = []
   for (const lane of lanes) {
-    for (const championId of champs) {
+    const laneChamps = (championsByLane.get(lane) ?? []).slice(0, limit ?? Number.MAX_SAFE_INTEGER)
+    for (const championId of laneChamps) {
       const needM = !(samePatch && warehouse.hasMatchups(patch, lane, championId))
       const needS = !(samePatch && warehouse.hasSynergies(patch, lane, championId))
       if (needM || needS) jobs.push({ lane, championId, need: needM && needS ? 'both' : needM ? 'matchups' : 'synergies' })
     }
   }
 
+  let aborted = false
+  let consecutiveFailures = 0
+  const stopRequested = (): boolean => blocked || aborted
+  const noteFailure = (): void => {
+    anythingFailed = true
+    if (++consecutiveFailures >= abortAfter) aborted = true
+  }
+
   let done = 0
   const total = jobs.length
   await runPool(jobs, concurrency, async job => {
-    if (blocked) return
+    if (stopRequested()) return
     try {
-      if (job.need !== 'synergies') {
+      if (job.need !== 'synergies' && !stopRequested()) {
         const rows = await client.getMatchups(patch!, job.lane, job.championId)
         if (rows && rows.length > 0) {
           warehouse.saveMatchups(patch!, job.lane, job.championId, rows)
           result.matchups.fetched++
+          consecutiveFailures = 0
         } else {
           result.matchups.failed++
-          anythingFailed = true
+          noteFailure()
         }
       }
-      if (job.need !== 'matchups') {
+      if (job.need !== 'matchups' && !stopRequested()) {
         const rows = await client.getSynergies(patch!, job.lane, job.championId)
         if (rows && rows.length > 0) {
           warehouse.saveSynergies(patch!, job.lane, job.championId, rows)
           result.synergies.fetched++
+          consecutiveFailures = 0
         } else {
           result.synergies.failed++
-          anythingFailed = true
+          noteFailure()
         }
       }
     } catch (error) {

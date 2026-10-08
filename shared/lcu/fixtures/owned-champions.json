@@ -1,0 +1,8 @@
+[
+  { "id": 84, "ownership": { "owned": true } },
+  { "id": 112, "ownership": { "owned": true } },
+  { "id": 711, "ownership": { "owned": true } },
+  { "id": 101, "ownership": { "owned": false } },
+  { "id": 57, "ownership": { "owned": false } },
+  { "id": 22, "ownership": { "owned": true } }
+]

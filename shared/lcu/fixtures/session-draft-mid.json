@@ -1,0 +1,26 @@
+{
+  "actions": [[
+    { "actorCellId": 3, "championId": 0, "completed": true, "id": 1, "isAllyAction": false, "isInProgress": false, "type": "ban" },
+    { "actorCellId": 1, "championId": 0, "completed": true, "id": 2, "isAllyAction": true, "isInProgress": false, "type": "ban" }
+  ], [
+    { "actorCellId": 2, "championId": 84, "completed": true, "id": 3, "isAllyAction": false, "isInProgress": false, "type": "pick" },
+    { "actorCellId": 1, "championId": 123, "completed": true, "id": 4, "isAllyAction": true, "isInProgress": false, "type": "pick" }
+  ]],
+  "benchChampions": [],
+  "benchEnabled": false,
+  "localPlayerCellId": 1,
+  "myTeam": [
+    { "assignedPosition": "top", "cellId": 0, "championId": 86, "championPickIntent": 0, "summonerId": 11, "puuid": "p-0", "team": 1, "spell1Id": 4, "spell2Id": 12 },
+    { "assignedPosition": "middle", "cellId": 1, "championId": 0, "championPickIntent": 0, "summonerId": 12, "puuid": "p-1", "team": 1, "spell1Id": 4, "spell2Id": 14 },
+    { "assignedPosition": "jungle", "cellId": 2, "championId": 64, "championPickIntent": 0, "summonerId": 13, "puuid": "p-2", "team": 1, "spell1Id": 4, "spell2Id": 11 }
+  ],
+  "theirTeam": [
+    { "assignedPosition": "", "cellId": 5, "championId": 112, "championPickIntent": 0, "summonerId": 21, "puuid": "e-0", "team": 2, "spell1Id": 4, "spell2Id": 12 },
+    { "assignedPosition": "", "cellId": 6, "championId": 0, "championPickIntent": 0, "summonerId": 22, "puuid": "e-1", "team": 2, "spell1Id": 0, "spell2Id": 0 },
+    { "assignedPosition": "", "cellId": 7, "championId": 0, "championPickIntent": 0, "summonerId": 23, "puuid": "e-2", "team": 2, "spell1Id": 0, "spell2Id": 0 }
+  ],
+  "queueId": 420,
+  "rerollsRemaining": 0,
+  "timer": { "phase": "BAN_PICK", "adjustedTimeLeftInPhase": 20000, "totalTimeInPhase": 30000 },
+  "bans": { "myTeamBans": [105], "theirTeamBans": [99], "numBans": 10 }
+}

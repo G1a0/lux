@@ -1,0 +1,23 @@
+{
+  "actions": [],
+  "benchChampions": [
+    { "championId": 84, "isPriority": false },
+    { "championId": 57, "isPriority": false }
+  ],
+  "benchEnabled": true,
+  "localPlayerCellId": 2,
+  "myTeam": [
+    { "assignedPosition": "", "cellId": 0, "championId": 111, "championPickIntent": 0, "summonerId": 31, "puuid": "p-0", "team": 1, "spell1Id": 4, "spell2Id": 32 },
+    { "assignedPosition": "", "cellId": 1, "championId": 90, "championPickIntent": 0, "summonerId": 32, "puuid": "p-1", "team": 1, "spell1Id": 4, "spell2Id": 32 },
+    { "assignedPosition": "", "cellId": 2, "championId": 711, "championPickIntent": 0, "summonerId": 33, "puuid": "p-2", "team": 1, "spell1Id": 4, "spell2Id": 32 }
+  ],
+  "theirTeam": [
+    { "assignedPosition": "", "cellId": 5, "championId": 105, "championPickIntent": 0, "summonerId": 41, "puuid": "e-0", "team": 2, "spell1Id": 4, "spell2Id": 32 },
+    { "assignedPosition": "", "cellId": 6, "championId": 64, "championPickIntent": 0, "summonerId": 42, "puuid": "e-1", "team": 2, "spell1Id": 4, "spell2Id": 32 },
+    { "assignedPosition": "", "cellId": 7, "championId": 0, "championPickIntent": 0, "summonerId": 43, "puuid": "e-2", "team": 2, "spell1Id": 0, "spell2Id": 0 }
+  ],
+  "queueId": 450,
+  "rerollsRemaining": 2,
+  "timer": { "phase": "BAN_PICK", "adjustedTimeLeftInPhase": 25000, "totalTimeInPhase": 60000 },
+  "bans": { "myTeamBans": [], "theirTeamBans": [], "numBans": 0 }
+}

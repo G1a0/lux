@@ -69,9 +69,9 @@ export interface ChampionDetail {
 }
 
 export interface FreeRotationInfo {
-  freeChampionIds: number[]
-  freeChampionIdsForNewPlayers: number[]
-  maxNewPlayerLevel: number
+  freeChampionIds?: number[]
+  freeChampionIdsForNewPlayers?: number[]
+  maxNewPlayerLevel?: number
 }
 
 export interface LcuEventMessage {

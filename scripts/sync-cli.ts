@@ -1,4 +1,5 @@
 // 手工/定时跑同步：npx tsx scripts/sync-cli.ts --root ./data --lanes MIDDLE --limit 3
+// --version 16.19 # 固定版本（新版本数据未就绪时用）
 // 禁窗内直接退出（exit 2），绝不发请求；同步结果 blocked 退出 3，partial 退出 1。
 // 全量同步默认放慢（间隔 500ms、并发 3），可用 --interval/--concurrency 覆盖；
 // 过快会被腾讯 WAF 限流（2026-10-08 全量 1.7k 突发请求触发过 501）。
@@ -15,6 +16,7 @@ function arg(name: string): string | undefined {
 
 async function main(): Promise<void> {
   const root = arg('root') ?? './data'
+  const version = arg('version')
   const lanesArg = arg('lanes')
   const lanes = (lanesArg ? lanesArg.split(',') : ALL_LANES) as Qq101Lane[]
   const limit = arg('limit') ? Number(arg('limit')) : undefined
@@ -31,12 +33,13 @@ async function main(): Promise<void> {
 
   const client = createQq101Client({ minIntervalMs: interval })
   const warehouse = createWarehouse(root)
-  console.log(`[sync] 数据目录：${root}，位置：${lanes.join(',')}${limit ? `，每位置英雄上限：${limit}` : ''}（间隔 ${interval}ms，并发 ${concurrency}）`)
+  console.log(`[sync] 数据目录：${root}，位置：${lanes.join(',')}${limit ? `，每位置英雄上限：${limit}` : ''}（间隔 ${interval}ms，并发 ${concurrency}）${version ? `，固定版本：${version}` : ''}`)
 
   const result = await syncRiftData({
     client,
     warehouse,
     lanes,
+    patchOverride: version,
     championLimitPerLane: limit,
     concurrency,
     onProgress: (done, total) => {

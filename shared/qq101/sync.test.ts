@@ -12,7 +12,7 @@ import type { Qq101Lane } from '../positions'
 const CHAMPS = [84, 711, 876]
 
 interface FakeCall {
-  kind: 'tier' | 'matchups' | 'synergies' | 'runes' | 'spells' | 'aram'
+  kind: 'patch' | 'tier' | 'matchups' | 'synergies' | 'runes' | 'spells' | 'aram'
   lane: Qq101Lane | 'ALL' | null
   championId?: number
 }
@@ -39,7 +39,7 @@ function createFakeClient(opts: {
   const calls: FakeCall[] = []
   let remaining = opts.blockAfter ?? Infinity
   const client: Qq101Client = {
-    async getPatch() { return '16.19' },
+    async getPatch() { calls.push({ kind: 'patch', lane: null }); return '16.19' },
     async getTierList(_patch, lane) {
       calls.push({ kind: 'tier', lane })
       if (opts.emptyTier) return { date: '', champions: [] }
@@ -126,7 +126,7 @@ describe('syncRiftData', () => {
     const second = createFakeClient()
     const result = await syncRiftData({ client: second.client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
     expect(result.status).toBe('up-to-date')
-    expect(second.calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram')).toHaveLength(0)
+    expect(second.calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram' && c.kind !== 'patch')).toHaveLength(0)
   })
 
   it('个别英雄失败 → partial，计数正确；重跑会补齐', async () => {
@@ -184,7 +184,7 @@ describe('syncRiftData', () => {
     expect(result.status).toBe('partial')
     expect(result.aram).toBe('failed')
     // 首轮 3 个 worker 各发出 1 个 matchups 后即熔断，符文/技能不再发出
-    expect(calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram')).toHaveLength(3)
+    expect(calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram' && c.kind !== 'patch')).toHaveLength(3)
   })
 
   it('大乱斗总览单发一次并写 manifest.aramDate', async () => {
@@ -217,5 +217,17 @@ describe('syncRiftData', () => {
     const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
     expect(result.status).toBe('blocked')
     expect(wh.readManifest()).toBeNull()
+  })
+
+  it('patchOverride 固定版本：跳过版本查询、按指定版本抓取', async () => {
+    const { client, calls } = createFakeClient()
+    const result = await syncRiftData({
+      client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'],
+      patchOverride: '16.88',
+    })
+    expect(calls.filter(c => c.kind === 'patch')).toHaveLength(0)
+    expect(result.patch).toBe('16.88')
+    expect(wh.hasTier('16.88', 'MIDDLE')).toBe(true)
+    expect(wh.readManifest()?.patch).toBe('16.88')
   })
 })

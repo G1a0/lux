@@ -27,6 +27,8 @@ export interface SyncOptions {
   warehouse: Warehouse
   isAllowed?: (now: Date) => boolean
   now?: () => Date
+  /** 固定版本（跳过版本查询；用于新版本数据未就绪或复现历史） */
+  patchOverride?: string
   lanes?: Qq101Lane[]
   championLimitPerLane?: number
   concurrency?: number
@@ -78,17 +80,19 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
     else throw error
   }
 
-  // 1) 版本
-  let patch: string | null = null
-  try {
-    patch = await client.getPatch()
-  } catch (error) {
-    catchBlocked(error)
-  }
-  if (blocked) {
-    result.status = 'blocked'
-    result.blockedUntil = nextAllowedTime(now()).toISOString()
-    return result
+  // 1) 版本（可用 patchOverride 固定，跳过查询）
+  let patch: string | null = options.patchOverride ?? null
+  if (!patch) {
+    try {
+      patch = await client.getPatch()
+    } catch (error) {
+      catchBlocked(error)
+    }
+    if (blocked) {
+      result.status = 'blocked'
+      result.blockedUntil = nextAllowedTime(now()).toISOString()
+      return result
+    }
   }
   if (!patch) {
     result.status = 'partial'

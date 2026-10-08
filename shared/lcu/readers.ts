@@ -52,8 +52,10 @@ export function createLcuReaders(http: LcuHttp): LcuReaders {
         const info = await http.get<FreeRotationInfo>('/lol-champions/v1/free-rotation')
         if (!info) return []
         return [...(info.freeChampionIds ?? []), ...(info.freeChampionIdsForNewPlayers ?? [])]
-      } catch {
-        return [] // 端点不存在（旧客户端）视作无周免
+      } catch (error) {
+        // 仅 404（旧客户端无此端点）视作无周免；连接类错误上抛，供 advisor 失败计数感知客户端状态
+        if (error instanceof LcuHttpError && error.status === 404) return []
+        throw error
       }
     },
 
@@ -69,8 +71,9 @@ export function createLcuReaders(http: LcuHttp): LcuReaders {
           }
         }
         return result
-      } catch {
-        return {} // 端点缺失/无数据：按无熟练度处理
+      } catch (error) {
+        if (error instanceof LcuHttpError && error.status === 404) return {}
+        throw error
       }
     },
   }

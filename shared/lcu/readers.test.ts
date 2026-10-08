@@ -51,4 +51,13 @@ describe('createLcuReaders', () => {
     mock = await createMockLcu({ certDir: CERT_DIR, routes: {} })
     expect(await readers().getChampSelectSession()).toBeNull()
   })
+
+  it('熟练度端点 404 时回退为空对象', async () => {
+    await mock.stop()
+    mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: { '/lol-champion-mastery/v1/local-player/champion-mastery': { status: 404 } },
+    })
+    expect(await readers().getChampionMasteryPoints()).toEqual({})
+  })
 })

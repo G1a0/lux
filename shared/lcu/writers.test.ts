@@ -1,8 +1,11 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { ARAM_RULES } from '../champions/aram-rules'
+import { parseQq101RunePages } from '../qq101/parse'
 import { createMockLcu, type MockLcu } from './mock/server'
 import { createLcuHttp } from './http'
-import { subStyleCodeToStyleId, applyRunePage, carrySpells } from './writers'
+import { subStyleCodeToStyleId, applyRunePage, carrySpells, keystoneToPrimaryStyleId } from './writers'
 
 const CERT_DIR = join(__dirname, 'fixtures', 'test-certs')
 let mock: MockLcu
@@ -123,5 +126,24 @@ describe('carrySpells', () => {
       url: '/lol-champ-select/v1/session/my-selection',
       body: { spell1Id: 4, spell2Id: 32 },
     })
+  })
+})
+
+describe('基石主系映射覆盖（防止新增基石漏映射）', () => {
+  it('全部内置大乱斗规则的基石都能推导主系', () => {
+    for (const rule of Object.values(ARAM_RULES)) {
+      expect(keystoneToPrimaryStyleId(rule.keystoneId), `rule=${rule.key}`).not.toBeNull()
+    }
+  })
+
+  it('全部 101 采集样本的第 1 页基石都能推导主系', () => {
+    const dir = join(__dirname, '..', 'qq101', 'fixtures')
+    const files = readdirSync(dir).filter(f => f.startsWith('recon-rule-') || f.startsWith('recon-runeinfo-'))
+    expect(files.length).toBeGreaterThanOrEqual(6)
+    for (const file of files) {
+      const raw = JSON.parse(readFileSync(join(dir, file), 'utf-8'))
+      const top = parseQq101RunePages(raw)[0]
+      expect(keystoneToPrimaryStyleId(top.keystoneId), `${file} keystone=${top.keystoneId}`).not.toBeNull()
+    }
   })
 })

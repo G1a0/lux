@@ -39,6 +39,12 @@ describe('mapRiftContext', () => {
     expect(mapAramInput(session)).toBeNull()
   })
 
+  it('benchEnabled=false 时忽略 benchChampions（防陈旧数据）', () => {
+    const session = fixture('session-aram.json')
+    session.benchEnabled = false
+    expect(mapAramInput(session)!.bench).toEqual([])
+  })
+
   it('熟练度折算 0-100 并可注入上下文', () => {
     expect(proficiencyFromMastery(35000)).toBe(100)
     expect(proficiencyFromMastery(8000)).toBe(23)

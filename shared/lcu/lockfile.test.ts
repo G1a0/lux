@@ -67,4 +67,18 @@ describe('discoverLockfile', () => {
     writeFileSync(join(dir, 'lockfile'), '')
     expect(discoverLockfile({ envDir: dir })).toBeNull()
   })
+
+  it('process.env.LUX_LCU_DIR 作为环境级覆盖生效', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:7777:pw:https')
+    const prev = process.env.LUX_LCU_DIR
+    process.env.LUX_LCU_DIR = dir
+    try {
+      expect(discoverLockfile()?.port).toBe(7777)
+    } finally {
+      if (prev === undefined) delete process.env.LUX_LCU_DIR
+      else process.env.LUX_LCU_DIR = prev
+    }
+  })
 })

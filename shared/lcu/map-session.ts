@@ -52,7 +52,9 @@ export function mapAramInput(session: ChampSelectSession): AramJudgeInput | null
 
   return {
     current: me.championId,
-    bench: session.benchChampions.map(b => b.championId).filter(id => id > 0 && id !== me.championId),
+    bench: session.benchEnabled
+      ? session.benchChampions.map(b => b.championId).filter(id => id > 0 && id !== me.championId)
+      : [],
     diceLeft: session.rerollsRemaining,
     allies: session.myTeam.filter(p => p.cellId !== session.localPlayerCellId && p.championId > 0).map(p => p.championId),
     enemies: session.theirTeam.filter(p => p.championId > 0).map(p => p.championId),

@@ -47,7 +47,8 @@ export interface DiscoverOptions {
 }
 
 export function discoverLockfile(options: DiscoverOptions = {}): LcuLockfile | null {
-  const dirs = options.envDir ? [options.envDir] : (options.candidateDirs ?? DEFAULT_CANDIDATES)
+  const envDir = options.envDir ?? process.env.LUX_LCU_DIR
+  const dirs = envDir ? [envDir] : (options.candidateDirs ?? DEFAULT_CANDIDATES)
   for (const dir of dirs) {
     try {
       const parsed = parseLockfile(readFileSync(join(dir, 'lockfile'), 'utf-8'))

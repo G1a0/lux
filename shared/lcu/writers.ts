@@ -18,6 +18,7 @@ export function subStyleCodeToStyleId(code: string): number | null {
 
 export function keystoneToPrimaryStyleId(keystoneId: number): number | null {
   if (keystoneId === 9923) return 8100
+  if (keystoneId === 8992) return 8200 // 冥火之触（巫术系，编号不在 8xxx 带内）
   const band = Math.floor(keystoneId / 100) * 100
   return [8000, 8100, 8200, 8300, 8400].includes(band) ? band : null
 }
@@ -63,8 +64,9 @@ export async function applyRunePage(http: LcuHttp, page: RunePageInput): Promise
   // 保守清理：仅删除本应用此前创建的同前缀旧页（避免页数占满），失败不阻塞
   try {
     const pages = (await http.get<PerkPage[]>('/lol-perks/v1/pages')) ?? []
-    const own = pages.find(p => (p.name ?? '').startsWith(PAGE_NAME_PREFIX))
-    if (own) await http.del(`/lol-perks/v1/pages/${own.id}`)
+    for (const own of pages.filter(p => (p.name ?? '').startsWith(PAGE_NAME_PREFIX))) {
+      await http.del(`/lol-perks/v1/pages/${own.id}`)
+    }
   } catch {
     // 列页失败：直接尝试创建
   }

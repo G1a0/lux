@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ApiTimeBlockedError, type Qq101Client } from './client'
 import { syncRiftData } from './sync'
-import type { Qq101Matchup, Qq101Synergy, Qq101TierList } from './types'
+import type { Qq101AramHero, Qq101Matchup, Qq101RunePage, Qq101SpellCombo, Qq101Synergy, Qq101TierList } from './types'
 import { createWarehouse, type Warehouse } from '../warehouse/store'
 import type { Qq101Lane } from '../positions'
 
@@ -51,6 +51,10 @@ function createFakeClient(opts: {
       if (opts.failPairs || opts.failChampions?.includes(championId)) return null
       return [{ championId: 998, winRate: 0.58, games: 100 }]
     },
+    // 临时桩：Task 4 会用完整实现替换这三个方法
+    async getRunePages(): Promise<Qq101RunePage[] | null> { return null },
+    async getSpellCombos(): Promise<Qq101SpellCombo[] | null> { return null },
+    async getAramOverview(): Promise<Qq101AramHero[] | null> { return null },
   }
   return { client, calls }
 }

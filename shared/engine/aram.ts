@@ -76,7 +76,7 @@ export function judgeAram(input: AramJudgeInput, data: EngineData): AramJudgeRes
     bench,
     swapTo,
     reason,
-    runes: { keystoneId: rule.keystoneId, runeIds: [...rule.runeIds], source: 'builtin' },
+    runes: { keystoneId: rule.keystoneId, runeIds: [...rule.runeIds], subStyleCode: rule.subStyleCode, source: 'builtin' },
     spells: { spellIds: [...rule.spellIds] as [number, number], source: 'builtin' },
   }
 }

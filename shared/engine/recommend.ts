@@ -40,7 +40,7 @@ export function recommendRift(ctx: DraftContext, data: EngineData): RiftAdvice {
   if (!ruleMode && lane) {
     const pages = data.runes(lane, primary.championId)
     if (pages && pages.length > 0) {
-      runes = { keystoneId: pages[0].keystoneId, runeIds: pages[0].runeIds, source: 'qq101' }
+      runes = { keystoneId: pages[0].keystoneId, runeIds: pages[0].runeIds, subStyleCode: pages[0].subStyleCode, source: 'qq101' }
     }
     const combos = data.spells(lane, primary.championId)
     if (combos && combos.length > 0) {

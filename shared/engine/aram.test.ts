@@ -45,6 +45,7 @@ describe('judgeAram', () => {
     expect(r.runes).toEqual({
       keystoneId: 8112,
       runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
+      subStyleCode: 'jj',
       source: 'builtin',
     })
     expect(r.spells).toEqual({ spellIds: [4, 32], source: 'builtin' })

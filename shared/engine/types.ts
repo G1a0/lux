@@ -52,6 +52,8 @@ export interface ChampionRecommendation {
 export interface RuneAdvice {
   keystoneId: number
   runeIds: number[]
+  /** 副系 code（jm/zj/zz/ws/jj/qd），用于 LCU 写入时推导 subStyleId */
+  subStyleCode?: string
   source: 'qq101' | 'builtin'
 }
 

@@ -44,7 +44,7 @@ describe('aramRuleFor', () => {
   })
 })
 
-function topPageOf(fixture: unknown): { keystoneId: number; runeIds: number[] } {
+function topPageOf(fixture: unknown): { keystoneId: number; runeIds: number[]; subStyleCode: string } {
   const raw = fixture as { data: { _fieldValues: Record<string, string> } }
   const key = Object.keys(raw.data._fieldValues)[0]
   const inner = JSON.parse(raw.data._fieldValues[key]) as { rune_top_details: string }
@@ -52,7 +52,11 @@ function topPageOf(fixture: unknown): { keystoneId: number; runeIds: number[] } 
     .split('#')
     .map(r => r.split('_'))
     .find(c => Number(c[0]) === 1)!
-  return { keystoneId: Number(top[1]), runeIds: top[3].split(',').map(Number) }
+  return {
+    keystoneId: Number(top[1]),
+    runeIds: top[3].split(',').map(Number),
+    subStyleCode: top[2],
+  }
 }
 
 describe('规则表数值与采集样本一致（防回归）', () => {
@@ -67,6 +71,7 @@ describe('规则表数值与采集样本一致（防回归）', () => {
     const expected = topPageOf(fixture)
     expect(ARAM_RULES[key].keystoneId).toBe(expected.keystoneId)
     expect(ARAM_RULES[key].runeIds).toEqual(expected.runeIds)
+    expect(ARAM_RULES[key].subStyleCode).toBe(expected.subStyleCode)
   })
 
   it('规则表已冻结（防共享数组被就地修改）', () => {

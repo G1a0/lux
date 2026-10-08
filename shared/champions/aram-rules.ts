@@ -12,6 +12,8 @@ export interface AramRule {
   sourceChampionId: number
   keystoneId: number
   runeIds: number[]
+  /** 副系 code（jm/zj/zz/ws/jj/qd），用于 LCU 写入时推导 subStyleId */
+  subStyleCode: string
   spellIds: [number, number]
 }
 
@@ -21,6 +23,7 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
     sourceChampionId: 84, // 采集于 recon-runeinfo-84-mid-20261008.json 第 1 页
     keystoneId: 8112,
     runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
+    subStyleCode: 'jj',
     spellIds: [4, 32],
   },
   mage: {
@@ -28,6 +31,7 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
     sourceChampionId: 112, // 采集于 recon-rule-mage-112-20261008.json 第 1 页
     keystoneId: 8992,
     runeIds: [8992, 8226, 8210, 8237, 8401, 8473, 5005, 5008, 5001],
+    subStyleCode: 'jj',
     spellIds: [4, 32],
   },
   tank: {
@@ -35,6 +39,7 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
     sourceChampionId: 57, // 采集于 recon-rule-tank-57-20261008.json 第 1 页
     keystoneId: 8437,
     runeIds: [8437, 8446, 8444, 8451, 8345, 8347, 5005, 5001, 5001],
+    subStyleCode: 'qd',
     spellIds: [4, 32],
   },
   marksman: {
@@ -42,6 +47,7 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
     sourceChampionId: 81, // 采集于 recon-rule-marksman-81-20261008.json 第 1 页
     keystoneId: 8008,
     runeIds: [8008, 8009, 9103, 8014, 8304, 8345, 5005, 5008, 5001],
+    subStyleCode: 'qd',
     spellIds: [4, 32],
   },
   support: {
@@ -49,6 +55,7 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
     sourceChampionId: 117, // 采集于 recon-rule-support-117-20261008.json 第 1 页
     keystoneId: 8214,
     runeIds: [8214, 8226, 8210, 8237, 8453, 8473, 5007, 5008, 5001],
+    subStyleCode: 'jj',
     spellIds: [4, 32],
   },
   fighter: {
@@ -56,6 +63,7 @@ export const ARAM_RULES: Record<AramRuleKey, AramRule> = {
     sourceChampionId: 122, // 采集于 recon-rule-fighter-122-20261008.json 第 1 页
     keystoneId: 8010,
     runeIds: [8010, 9111, 9104, 8299, 8224, 8234, 5005, 5008, 5001],
+    subStyleCode: 'ws',
     spellIds: [4, 32],
   },
 }

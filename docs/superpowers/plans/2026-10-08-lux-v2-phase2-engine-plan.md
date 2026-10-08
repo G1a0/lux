@@ -1552,6 +1552,7 @@ export function buildCandidatePool(ctx: DraftContext, data: EngineData): number[
 
   const exclude = new Set<number>([
     ...ctx.allies.map(p => p.championId),
+    ...ctx.enemies.map(p => p.championId),
     ...(ctx.bans ?? []),
   ])
 

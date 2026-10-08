@@ -969,7 +969,7 @@ export function isFrontline(meta: ChampionMeta | null): boolean {
 - [ ] **Step 4: 运行确认通过**
 
 Run: `npx vitest run shared/champions/meta.test.ts`
-Expected: PASS（3 条）
+Expected: PASS（2 条）
 
 - [ ] **Step 5: 提交**
 
@@ -1566,6 +1566,7 @@ export function buildCandidatePool(ctx: DraftContext, data: EngineData): number[
 }
 
 function allChampionIds(data: EngineData): number[] {
+  // 1..999 覆盖全部现行英雄 id（最大 ≈950）；Phase 3 接入 LCU 字典时改为注入完整清单。
   const ids: number[] = []
   for (let id = 1; id <= 999; id++) {
     if (data.champion(id)) ids.push(id)

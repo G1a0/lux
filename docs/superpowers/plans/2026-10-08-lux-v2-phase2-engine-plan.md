@@ -1898,7 +1898,7 @@ Expected: FAIL（模块不存在）
 - [ ] **Step 3: 实现 `shared/engine/score.ts`**
 
 ```ts
-import type { Qq101Lane } from '../positions'
+import { toQq101Lane, type Qq101Lane } from '../positions'
 import type { ChampionMeta } from '../champions/meta'
 import { isFrontline } from '../champions/meta'
 import { buildReason } from './reasons'
@@ -1977,7 +1977,7 @@ export function scoreMatchup(
   const detail: ReasonDetail | undefined = best && best.score !== NEUTRAL_SCORE
     ? { kind: 'matchup', enemyChampionId: best.championId, winRate: best.winRate }
     : undefined
-  return { score: round1(clamp(sum / enemies.length)), detail }
+  return { score: clamp(sum / enemies.length), detail }
 }
 
 export function scoreSynergy(
@@ -2080,9 +2080,9 @@ export function scoreBeginner(
 export interface ScoreOptions {
   modeLabel: string
   weights?: FactorWeights
-  /** 强度来源（'ALL' 用于盲选；null 用于规则模式/大乱斗） */
+  /** 强度来源（'ALL' 用于盲选；null = 不评强度）。缺省 = 由 ctx.myPosition 推导 */
   strengthLane?: Qq101Lane | 'ALL' | null
-  /** 对位/协同来源（null = 不计这两个因素） */
+  /** 对位/协同来源（null = 不计这两个因素）。缺省 = 由 ctx.myPosition 推导 */
   pairLane?: Qq101Lane | null
   /** 覆盖强度因素（大乱斗由 aram.ts 提供） */
   strengthOverride?: FactorOutcome | null
@@ -2095,8 +2095,9 @@ export function scoreChampion(
   options: ScoreOptions,
 ): ChampionRecommendation {
   const weights = options.weights ?? WEIGHTS_BY_QUEUE[ctx.queueId as QueueId] ?? {}
-  const strengthLane = options.strengthLane ?? null
-  const pairLane = options.pairLane ?? null
+  const defaultLane = toQq101Lane(ctx.myPosition ?? '')
+  const strengthLane = options.strengthLane === undefined ? defaultLane : options.strengthLane
+  const pairLane = options.pairLane === undefined ? defaultLane : options.pairLane
 
   const outcomes: Record<FactorKey, FactorOutcome> = {
     strength: options.strengthOverride
@@ -2160,7 +2161,7 @@ export function scoreAll(
 - [ ] **Step 4: 运行确认通过**
 
 Run: `npx vitest run shared/engine/score.test.ts`
-Expected: PASS（11 条）
+Expected: PASS（12 条）
 
 - [ ] **Step 5: 提交**
 

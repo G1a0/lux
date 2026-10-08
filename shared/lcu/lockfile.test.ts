@@ -20,6 +20,15 @@ describe('parseLockfile', () => {
     expect(parseLockfile('LeagueClient:x:54321:secretPW:https')).toBeNull()
     expect(parseLockfile('')).toBeNull()
   })
+
+  it('校验加固：pid/端口边界与协议白名单', () => {
+    expect(parseLockfile('LeagueClient:0:54321:pw:https')).toBeNull()
+    expect(parseLockfile('LeagueClient:1:99999:pw:https')).toBeNull()
+    expect(parseLockfile('LeagueClient:1:54321:pw:ht')).toBeNull()
+    expect(parseLockfile('LeagueClient:1:54321:pw:')).toEqual({
+      processName: 'LeagueClient', pid: 1, port: 54321, password: 'pw', protocol: 'https',
+    })
+  })
 })
 
 describe('discoverLockfile', () => {
@@ -50,5 +59,12 @@ describe('discoverLockfile', () => {
     writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:9999:pw:https')
     const found = discoverLockfile({ envDir: undefined, candidateDirs: [join(dir, '不存在'), dir] })
     expect(found?.port).toBe(9999)
+  })
+
+  it('lockfile 存在但为空（0 字节，客户端未运行时的真实状态）→ null', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'lockfile'), '')
+    expect(discoverLockfile({ envDir: dir })).toBeNull()
   })
 })

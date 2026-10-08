@@ -34,7 +34,7 @@ export interface Qq101RunePage {
   keystoneId: number
   /** 副系 code：jm=精密 zj/zz=主宰 ws=巫术 jj=坚决 qd=启迪 */
   subStyleCode: string
-  /** 9 个符文 id：主系 4 + 副系 2 + 属性碎片 3 */
+  /** 9 个符文 id：主系 4 + 副系 2 + 属性碎片 3（上游畸形时可能少于 9 个） */
   runeIds: number[]
   pickRate: number | null
   winRate: number | null
@@ -42,6 +42,7 @@ export interface Qq101RunePage {
 }
 
 export interface Qq101SpellCombo {
+  /** 上游响应原序（101 前端习惯将闪现置第 2 位）；消费方按「组合集合」处理，勿依赖槽位语义 */
   spellIds: [number, number]
   winRate: number | null
   pickRate: number | null

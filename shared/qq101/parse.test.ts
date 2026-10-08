@@ -166,3 +166,21 @@ describe('parseQq101AramOverview', () => {
     expect(parseQq101AramOverview({ code: 1 })).toEqual([])
   })
 })
+
+describe('解析器健壮性（审查补充）', () => {
+  it('截断记录被丢弃（长度/必填字段守卫）', () => {
+    expect(parseQq101RunePages({ code: 0, data: { result: JSON.stringify({ rune_top_details: '1_8112_jj_1,2,3' }) } })).toEqual([])
+    expect(parseQq101SpellCombos({ code: 0, data: { result: JSON.stringify({ data_details: '12_4_46.77' }) } })).toEqual([])
+    expect(parseQq101AramOverview({ code: 0, data: { result: JSON.stringify({ listcollect: '22' }) } })).toEqual([])
+  })
+
+  it('大乱斗兼容 | 分隔与旧版 11 字段记录（只取 s0–s9）', () => {
+    const eleven = '22_1_未变化_0.5_0.1_25,0.01,0.5,1_200_0.6_0.2_0.1_999,888'
+    const one = parseQq101AramOverview({ code: 0, data: { result: JSON.stringify({ listcollect: eleven }) } })
+    expect(one).toHaveLength(1)
+    expect(one[0].championId).toBe(22)
+    expect(one[0].rank).toBe(1)
+    const two = parseQq101AramOverview({ code: 0, data: { result: JSON.stringify({ listcollect: `${eleven}|${eleven}` }) } })
+    expect(two).toHaveLength(2)
+  })
+})

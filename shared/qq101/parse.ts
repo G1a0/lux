@@ -1,5 +1,6 @@
 // 101.qq.com(腾讯官方) 数据源解析。响应外层: {code, data: {result: "<JSON字符串">}}
 // 记录格式: '#' 分隔记录、'_' 分隔字段、百分比为 0-100 数值
+// 例外：大乱斗总览（aram_hero_overview）的比率为 0-1 小数，记录分隔符兼容 '#' 与 '|'
 
 import { fromQq101Position } from '../positions'
 import type {
@@ -181,7 +182,8 @@ export function parseQq101AramOverview(response: unknown): Qq101AramHero[] {
     .flatMap(record => {
       const fields = record.split('_')
       const championId = toNumber(fields[0])
-      if (championId === null) return []
+      const rank = toNumber(fields[1])
+      if (championId === null || rank === null) return []
       const bestPartners = (fields[5] ?? '').split('&').flatMap(entry => {
         if (!entry) return []
         const p = entry.split(',')
@@ -196,7 +198,7 @@ export function parseQq101AramOverview(response: unknown): Qq101AramHero[] {
       })
       return [{
         championId,
-        rank: toNumber(fields[1]),
+        rank,
         rankChange: fields[2] ?? '',
         winRate: toNumber(fields[3]),
         pickRate: toNumber(fields[4]),

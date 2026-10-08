@@ -32,6 +32,8 @@ function createFakeClient(opts: {
   blockAfter?: number
   emptyTier?: boolean
   failPairs?: boolean
+  failTierLane?: Qq101Lane | 'ALL'
+  blockAram?: boolean
   champsByLane?: Partial<Record<Qq101Lane, number[]>>
 } = {}) {
   const calls: FakeCall[] = []
@@ -41,6 +43,7 @@ function createFakeClient(opts: {
     async getTierList(_patch, lane) {
       calls.push({ kind: 'tier', lane })
       if (opts.emptyTier) return { date: '', champions: [] }
+      if (opts.failTierLane === lane) return { date: '', champions: [] }
       return fakeTier(opts.champsByLane?.[lane as Qq101Lane] ?? CHAMPS)
     },
     async getMatchups(_patch, lane, championId): Promise<Qq101Matchup[] | null> {
@@ -69,6 +72,7 @@ function createFakeClient(opts: {
     },
     async getAramOverview(_dtstatdate): Promise<Qq101AramHero[] | null> {
       calls.push({ kind: 'aram', lane: null })
+      if (opts.blockAram) throw new ApiTimeBlockedError(new Date())
       if (opts.failPairs) return null
       return [{
         championId: 22, rank: 1, rankChange: '未变化', winRate: 0.5456, pickRate: 0.1539,
@@ -152,6 +156,15 @@ describe('syncRiftData', () => {
     expect(wh.readManifest()).toBeNull()
   })
 
+  it('仅 ALL 榜为空 → partial，各位置照常同步', async () => {
+    const { client, calls } = createFakeClient({ failTierLane: 'ALL' })
+    const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
+    expect(result.status).toBe('partial')
+    expect(wh.hasTier('16.19', 'ALL')).toBe(false)
+    expect(wh.hasTier('16.19', 'MIDDLE')).toBe(true)
+    expect(calls.filter(c => c.kind === 'matchups')).toHaveLength(3)
+  })
+
   it('对位/协同只按各位置自己的榜单英雄取数', async () => {
     const { client, calls } = createFakeClient({ champsByLane: { MIDDLE: [84, 711], TOP: [122] } })
     await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['TOP', 'MIDDLE'] })
@@ -169,6 +182,7 @@ describe('syncRiftData', () => {
       abortAfterConsecutiveFailures: 1,
     })
     expect(result.status).toBe('partial')
+    expect(result.aram).toBe('failed')
     // 首轮 3 个 worker 各发出 1 个 matchups 后即熔断，符文/技能不再发出
     expect(calls.filter(c => c.kind !== 'tier' && c.kind !== 'aram')).toHaveLength(3)
   })
@@ -195,5 +209,13 @@ describe('syncRiftData', () => {
     })
     expect(result.aram).toBe('skipped')
     expect(calls.filter(c => c.kind === 'aram')).toHaveLength(0)
+    expect(wh.readManifest()?.aramDate).toBe('20261007')
+  })
+
+  it('大乱斗总览遇禁窗 → blocked 且不写 manifest', async () => {
+    const { client } = createFakeClient({ blockAram: true })
+    const result = await syncRiftData({ client, warehouse: wh, isAllowed: () => true, lanes: ['MIDDLE'] })
+    expect(result.status).toBe('blocked')
+    expect(wh.readManifest()).toBeNull()
   })
 })

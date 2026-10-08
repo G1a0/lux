@@ -1,5 +1,5 @@
 // 手工/定时跑同步：npx tsx scripts/sync-cli.ts --root ./data --lanes MIDDLE --limit 3
-// 禁窗内直接退出（exit 2），绝不发请求。
+// 禁窗内直接退出（exit 2），绝不发请求；同步结果 blocked 退出 3，partial 退出 1。
 // 全量同步默认放慢（间隔 500ms、并发 3），可用 --interval/--concurrency 覆盖；
 // 过快会被腾讯 WAF 限流（2026-10-08 全量 1.7k 突发请求触发过 501）。
 import { createQq101Client } from '../shared/qq101/client'
@@ -44,7 +44,7 @@ async function main(): Promise<void> {
     },
   })
   console.log('[sync] 结果：', JSON.stringify(result, null, 2))
-  process.exit(result.status === 'partial' ? 1 : 0)
+  process.exit(result.status === 'partial' ? 1 : result.status === 'blocked' ? 3 : 0)
 }
 
 main().catch(error => {

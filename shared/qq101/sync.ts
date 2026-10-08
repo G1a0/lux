@@ -234,7 +234,7 @@ export async function syncRiftData(options: SyncOptions): Promise<SyncResult> {
   let aramDateForManifest: string | undefined
   if (!blocked) {
     const aramDate = aramDateString(now())
-    if (samePatch && manifest?.aramDate === aramDate && warehouse.hasAram(aramDate)) {
+    if (manifest?.aramDate === aramDate && warehouse.hasAram(aramDate)) {
       result.aram = 'skipped'
     } else {
       try {

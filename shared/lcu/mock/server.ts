@@ -38,6 +38,8 @@ export interface MockLcu {
   pushEvent(uri: string, eventType: string, data: unknown): void
   /** 断开所有 WS 客户端（监听保留，模拟 LCU 重启） */
   closeClients(): void
+  /** 停止对外服务（关 WSS+HTTPS）但保留 lockfile 目录，模拟客户端崩溃残留 */
+  stopServing(): Promise<void>
   stop(): Promise<void>
 }
 
@@ -121,12 +123,19 @@ export async function createMockLcu(options: MockLcuOptions): Promise<MockLcu> {
     for (const client of wss.clients) client.terminate()
   }
 
-  async function stop(): Promise<void> {
+  let serving = true
+  async function stopServing(): Promise<void> {
+    if (!serving) return // 幂等：stopServing 后仍会调用 stop 清理目录
+    serving = false
     closeClients() // 先断开客户端，避免 wss.close 等待悬挂连接
     if (wss) await new Promise<void>(resolve => wss.close(() => resolve()))
     await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+
+  async function stop(): Promise<void> {
+    await stopServing()
     rmSync(lcuDir, { recursive: true, force: true })
   }
 
-  return { port, password, lcuDir, received, server, pushEvent, closeClients, stop }
+  return { port, password, lcuDir, received, server, pushEvent, closeClients, stopServing, stop }
 }

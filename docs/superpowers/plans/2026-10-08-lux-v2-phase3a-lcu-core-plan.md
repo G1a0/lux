@@ -2101,7 +2101,7 @@ async function main(): Promise<void> {
       const applied = await applyRunePage(http, {
         name: result.action, // 前缀由 applyRunePage 统一添加（Lux·）
         keystoneId: result.runes.keystoneId,
-        subStyleCode: 'jj',
+        subStyleCode: result.runes.subStyleCode ?? 'jj',
         runeIds: result.runes.runeIds,
       })
       const carried = await carrySpells(http, result.spells!.spellIds)
@@ -2118,7 +2118,7 @@ async function main(): Promise<void> {
       const applied = await applyRunePage(http, {
         name: '排位', // 前缀由 applyRunePage 统一添加（Lux·）
         keystoneId: advice.runes?.keystoneId ?? 0,
-        subStyleCode: 'jj',
+        subStyleCode: advice.runes?.subStyleCode ?? 'jj',
         runeIds: advice.runes?.runeIds ?? [],
       })
       const carried = await carrySpells(http, advice.spells.spellIds)

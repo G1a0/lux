@@ -1,0 +1,7 @@
+[
+  { "id": 84, "name": "阿卡丽", "alias": "Akali", "roles": ["ASSASSIN"] },
+  { "id": 112, "name": "维克托", "alias": "Viktor", "roles": ["MAGE"] },
+  { "id": 57, "name": "茂凯", "alias": "Maokai", "roles": ["TANK", "SUPPORT"] },
+  { "id": 22, "name": "艾希", "alias": "Ashe", "roles": ["MARKSMAN", "SUPPORT"] },
+  { "id": 64, "name": "李青", "alias": "LeeSin", "roles": ["FIGHTER"] }
+]

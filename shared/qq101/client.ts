@@ -61,6 +61,8 @@ export function createQq101Client(options: CreateQq101ClientOptions = {}): Qq101
     if (!allowed(t)) throw new ApiTimeBlockedError(t)
     const wait = lastRequestAt + minIntervalMs - Date.now()
     if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait))
+    const afterSleep = now()
+    if (!allowed(afterSleep)) throw new ApiTimeBlockedError(afterSleep)
     lastRequestAt = Date.now()
   }
 

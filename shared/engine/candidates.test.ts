@@ -76,4 +76,18 @@ describe('buildCandidatePool', () => {
     const pool = buildCandidatePool(ctx(420, { myPosition: 'mid', allies: [{ championId: 1 }] }), data)
     expect(pool).toEqual([2])
   })
+
+  it('ALL 榜含重复英雄（英雄×位置多记录）时去重', () => {
+    const dupTier: Qq101TierList = {
+      date: 'x',
+      champions: [
+        { rank: 1, championId: 84, strengthTier: 'T1', position: 'mid', winRate: 0.5, pickRate: 0.1, banRate: 0.05, counterChampionIds: [] },
+        { rank: 2, championId: 84, strengthTier: 'T1', position: 'top', winRate: 0.5, pickRate: 0.1, banRate: 0.05, counterChampionIds: [] },
+        { rank: 3, championId: 112, strengthTier: 'T1', position: 'mid', winRate: 0.5, pickRate: 0.1, banRate: 0.05, counterChampionIds: [] },
+      ],
+    }
+    const data = makeData({ tierList: lane => (lane === 'ALL' ? dupTier : null) })
+    const pool = buildCandidatePool(ctx(430), data)
+    expect(pool).toEqual([84, 112])
+  })
 })

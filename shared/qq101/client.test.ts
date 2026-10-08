@@ -125,3 +125,18 @@ describe('aramDateString', () => {
     expect(aramDateString(new Date(2026, 10, 1))).toBe('20261031')
   })
 })
+
+describe('guard 二次校验', () => {
+  it('节流睡眠后再次校验时段（防跨窗口边界漏发）', async () => {
+    const calls: string[] = []
+    let checks = 0
+    const client = createQq101Client({
+      fetchImpl: okFetch(versionlistFixture, calls),
+      isAllowed: () => { checks += 1; return checks <= 3 },
+      minIntervalMs: 10,
+    })
+    await client.getTierList('16.19', 'ALL') // 前两次校验通过并发出请求
+    await expect(client.getTierList('16.19', 'TOP')).rejects.toBeInstanceOf(ApiTimeBlockedError)
+    expect(calls).toHaveLength(1)
+  })
+})

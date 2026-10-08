@@ -10,7 +10,7 @@ export function buildCandidatePool(ctx: DraftContext, data: EngineData): number[
   const isBlind = ctx.queueId === 430
   const lane = isBlind ? ('ALL' as const) : toQq101Lane(ctx.myPosition)
   const tierList = lane ? data.tierList(lane) : null
-  const base = tierList ? tierList.champions.map(c => c.championId) : allChampionIds(data)
+  const base = tierList ? [...new Set(tierList.champions.map(c => c.championId))] : allChampionIds(data)
 
   const exclude = new Set<number>([
     ...ctx.allies.map(p => p.championId),

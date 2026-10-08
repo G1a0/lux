@@ -4,6 +4,8 @@ import { createChampionIndex } from '../champions/meta'
 import type { EngineData } from './data'
 import type { DraftContext } from './types'
 import type { Qq101TierList } from '../qq101/types'
+import tierlistAllFixture from '../qq101/fixtures/tierlist-all.json'
+import { parseQq101TierList } from '../qq101/parse'
 
 const INDEX = createChampionIndex([
   { id: 84, name: '阿卡丽', damageType: 'ap', roles: ['assassin'], difficulty: 7 },
@@ -117,5 +119,17 @@ describe('recommendRift', () => {
     expect(advice.alternates).toHaveLength(2)
     const scores = [advice.primary.score, ...advice.alternates.map(a => a.score)]
     expect(scores).toEqual([...scores].sort((a, b) => b - a))
+  })
+
+  it('盲选用真实 ALL 榜（多记录）时主推与备选无重复英雄', () => {
+    // 磁盘 fixture 为原始响应报文（{code, data:{result}}），与运行时一致先经解析器还原为 Qq101TierList。
+    const allTier = parseQq101TierList(tierlistAllFixture)
+    const data = makeData({
+      tierList: lane => (lane === 'ALL' ? allTier : null),
+    })
+    const advice = recommendRift({ queueId: 430, allies: [], enemies: [] }, data)
+    const ids = [advice.primary.championId, ...advice.alternates.map(a => a.championId)]
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(advice.alternates).toHaveLength(2)
   })
 })

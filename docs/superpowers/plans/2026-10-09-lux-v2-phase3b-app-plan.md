@@ -1905,7 +1905,6 @@ export function App(): React.JSX.Element {
     })
     const offOpen = bridge.onOpenView(v => {
       setView(v as View)
-      bridge.setWindowState(v)
     })
     return () => {
       offSnap()
@@ -1913,6 +1912,13 @@ export function App(): React.JSX.Element {
       offOpen()
     }
   }, [])
+
+  // 视图变化统一驱动窗口尺寸（快照驱动与手动切换都经此；none 不调整）
+  useEffect(() => {
+    if (view !== 'none') bridge.setWindowState(view)
+  }, [view])
+
+  // 注意：各回调（onDone/onClose/onExpand/onCollapse/onSettings）里不再内联调用 bridge.setWindowState —— 统一由上方 effect 处理
 
   if (view === 'none') {
     return <div className="placeholder">等待进入选人…</div>

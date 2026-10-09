@@ -104,4 +104,27 @@ describe('LcuAdvisor', () => {
       advisor.stop()
     }
   })
+
+  it('compute 可返回 Promise（异步预取场景）', async () => {
+    const mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: { '/lol-champ-select/v1/session': { json: fixture('session-draft-mid.json') } },
+    })
+    servers.push(mock)
+    const advisor = createLcuAdvisor({
+      lcuDirOverride: mock.lcuDir,
+      discoverIntervalMs: 50,
+      debounceMs: 20,
+      compute: async session => {
+        await new Promise(r => setTimeout(r, 10))
+        return { kind: 'rift', sessionQueueId: session.queueId }
+      },
+    })
+    const seen: number[] = []
+    advisor.onAdvice(s => seen.push(s.sessionQueueId))
+    advisor.start()
+    await waitFor(() => (seen.length > 0 ? true : null))
+    expect(seen[0]).toBe(420)
+    advisor.stop()
+  })
 })

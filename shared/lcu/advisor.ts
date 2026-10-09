@@ -16,7 +16,9 @@ export interface AdviceSnapshot {
   advice?: unknown
 }
 
-export type ComputeAdvice = (session: ChampSelectSession) => Omit<AdviceSnapshot, 'session'>
+export type ComputeAdvice = (
+  session: ChampSelectSession,
+) => Omit<AdviceSnapshot, 'session'> | Promise<Omit<AdviceSnapshot, 'session'>>
 
 export interface LcuAdvisorOptions {
   lcuDirOverride?: string
@@ -97,7 +99,7 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
       setStatus('in-champ-select')
       // 计算/回调属消费方代码：其异常不得冒泡为未处理拒绝（void evaluate）
       try {
-        const advice = options.compute(session)
+        const advice = await options.compute(session)
         const snapshot: AdviceSnapshot = { ...advice, session }
         adviceHandlers.forEach(h => h(snapshot))
       } catch (error) {

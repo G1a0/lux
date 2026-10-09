@@ -33,6 +33,8 @@ export interface ServiceDeps {
   syncRunner: SyncRunner
   dataRoot: string
   manifestReader?: () => ManifestInfo | null
+  /** 英雄名称查询（renderer 展示用）；缺省则快照不带 names */
+  championName?: (id: number) => string | null
 }
 
 export interface RosterCaches {
@@ -76,6 +78,16 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
     snapshotHandlers.forEach(h => h(payload))
   }
 
+  const namesFor = (ids: number[]): Record<number, string> | undefined => {
+    if (!deps.championName) return undefined
+    const out: Record<number, string> = {}
+    for (const id of [...new Set(ids)]) {
+      const name = deps.championName(id)
+      if (name) out[id] = name
+    }
+    return Object.keys(out).length > 0 ? out : undefined
+  }
+
   async function refreshRoster(): Promise<void> {
     const readers = deps.source.readers()
     if (!readers) return
@@ -99,7 +111,13 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       if (running) return
       running = true
       offAdvice = deps.source.onAdvice(snapshot => service.handleSession(snapshot.session))
-      offStatus = deps.source.onStatus(status => statusHandlers.forEach(h => h(status)))
+      offStatus = deps.source.onStatus(status => {
+        statusHandlers.forEach(h => h(status))
+        if (status !== 'in-champ-select') {
+          lastKey = '' // 允许重新进入时重发
+          emit({ kind: 'none' })
+        }
+      })
       deps.source.start()
       void refreshRoster()
       rosterTimer = setInterval(() => {
@@ -124,7 +142,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
     handleSession(session) {
       lastSession = session
       const config = deps.config.get()
-      const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.myTeam.map(p => p.assignedPosition).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}`
+      const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.myTeam.map(p => p.assignedPosition).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}|${session.bans.myTeamBans.join(',')}|${session.bans.theirTeamBans.join(',')}`
       if (key === lastKey) return
       lastKey = key
 
@@ -137,7 +155,17 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       if (isAram && aramInput) {
         if (!config.modes.aram) return emit({ kind: 'none' })
         try {
-          return emit({ kind: 'aram', queueId: session.queueId, aram: deps.computeAram(session, config) })
+          const aram = deps.computeAram(session, config)
+          return emit({
+            kind: 'aram',
+            queueId: session.queueId,
+            aram,
+            names: namesFor([
+              aram.current.championId,
+              ...(aram.swapTo ? [aram.swapTo.championId] : []),
+              ...aram.bench.map(b => b.championId),
+            ]),
+          })
         } catch (error) {
           console.warn('[service] ARAM 计算失败：', error)
           return emit({ kind: 'none' })
@@ -146,7 +174,13 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       if (!supported) return emit({ kind: 'unsupported', queueId: session.queueId })
       if (!config.modes.rift) return emit({ kind: 'none' })
       try {
-        emit({ kind: 'rift', queueId: session.queueId, advice: deps.computeRift(session, config, caches) })
+        const advice = deps.computeRift(session, config, caches)
+        emit({
+          kind: 'rift',
+          queueId: session.queueId,
+          advice,
+          names: namesFor([advice.primary.championId, ...advice.alternates.map(a => a.championId)]),
+        })
       } catch (error) {
         console.warn('[service] 推荐计算失败：', error)
         emit({ kind: 'none' })

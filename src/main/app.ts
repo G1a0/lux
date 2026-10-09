@@ -97,6 +97,7 @@ export function createAppWithPaths(
     },
     dataRoot: paths.dataRoot,
     manifestReader: () => warehouse.readManifest(),
+    championName: id => datasetRef.current.champion(id)?.name ?? null,
   })
 
   return { service, config, dataRoot: paths.dataRoot, configDir: paths.configDir }

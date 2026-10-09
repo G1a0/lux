@@ -49,6 +49,7 @@ function wireIpc(win: BrowserWindow, manager: WindowManager): void {
     win.webContents.send('lux:status', s)
     // 选人中 → 展示建议面板；离开选人 → 隐藏（settings/onboarding 视图由 manager 内部保持可见）
     manager.setAdviceActive(s === 'in-champ-select')
+    if (s !== 'in-champ-select') manager.setPinned(false) // 离开选人自动取消托盘钉住
   })
   service.onSyncProgress((d, t) => win.webContents.send('lux:sync-progress', d, t))
 
@@ -61,6 +62,7 @@ function wireIpc(win: BrowserWindow, manager: WindowManager): void {
   ipcMain.handle('lux:quit', () => app.quit())
   // 视图 → 窗口尺寸/显隐（renderer 切视图时上报）
   ipcMain.on('lux:set-window-state', (_e, state: string) => manager.setView(state))
+  ipcMain.on('lux:set-pinned', (_e, pinned: boolean) => manager.setPinned(!!pinned))
 }
 
 // 单实例锁：隐藏式窗口下重复双击会在后台起第二实例 → 双份 LCU 轮询 + 配置互相覆盖

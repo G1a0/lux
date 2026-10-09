@@ -16,8 +16,13 @@ function fakeConfig(initial: Partial<AppConfig> = {}): ConfigStore {
   }
 }
 
-function fakeSource(): AdviceSource & { emit(session: unknown): void; stopSpy: ReturnType<typeof vi.fn> } {
+function fakeSource(): AdviceSource & {
+  emit(session: unknown): void
+  emitStatus(status: string): void
+  stopSpy: ReturnType<typeof vi.fn>
+} {
   const adviceHandlers = new Set<(snapshot: { session: ChampSelectSession }) => void>()
+  const statusHandlers = new Set<(status: string) => void>()
   const stopSpy = vi.fn()
   return {
     start: () => {},
@@ -26,10 +31,14 @@ function fakeSource(): AdviceSource & { emit(session: unknown): void; stopSpy: R
       adviceHandlers.add(h)
       return () => adviceHandlers.delete(h)
     },
-    onStatus: () => () => {},
+    onStatus: h => {
+      statusHandlers.add(h)
+      return () => statusHandlers.delete(h)
+    },
     http: () => null,
     readers: () => null,
     emit: session => adviceHandlers.forEach(h => h({ session: session as ChampSelectSession })),
+    emitStatus: status => statusHandlers.forEach(h => h(status)),
     stopSpy,
   }
 }
@@ -69,11 +78,19 @@ const SESSION_ARAM = {
   myTeam: [{ ...SESSION_BASE.myTeam[0], championId: 15 }],
 } as never
 
-function makeService(overrides: { computeRift?: unknown; computeAram?: unknown } = {}) {
+function makeService(
+  overrides: {
+    computeRift?: unknown
+    computeAram?: unknown
+    championName?: (id: number) => string | null
+  } = {},
+) {
   const events: unknown[] = []
+  const source = fakeSource()
   const service = createCompanionService({
-    source: fakeSource(),
+    source,
     config: fakeConfig(),
+    championName: overrides.championName,
     computeRift: () =>
       (overrides.computeRift ?? {
         primary: {
@@ -103,7 +120,7 @@ function makeService(overrides: { computeRift?: unknown; computeAram?: unknown }
     dataRoot: '/tmp/lux-data',
   })
   service.onSnapshot(s => events.push(s))
-  return { service, events }
+  return { service, events, source }
 }
 
 describe('CompanionService', () => {
@@ -115,6 +132,20 @@ describe('CompanionService', () => {
     service.handleSession(SESSION_RIFT)
     expect(seen).toHaveLength(1)
     expect((seen[0] as { kind: string }).kind).toBe('rift')
+  })
+
+  it('注入 championName 时 rift 快照携带 names', () => {
+    const { service, events } = makeService({ championName: id => `英雄名${id}` })
+    service.handleSession(SESSION_RIFT)
+    const snap = events[0] as { kind: string; names?: Record<number, string> }
+    expect(snap.kind).toBe('rift')
+    expect(snap.names).toEqual({ 1: '英雄名1' }) // 默认桩：主推 championId=1、无备选
+  })
+
+  it('未注入 championName 时不产生 names 字段', () => {
+    const { service, events } = makeService()
+    service.handleSession(SESSION_RIFT)
+    expect((events[0] as { names?: unknown }).names).toBeUndefined()
   })
 
   it('aram 会话 → kind aram；队列不支持 → unsupported', () => {
@@ -246,5 +277,26 @@ describe('CompanionService', () => {
     } as never
     service.handleSession(moved)
     expect(seen).toHaveLength(2)
+  })
+
+  it('仅 Ban 变化也触发重发（去重键含 Ban）', () => {
+    const { service, events } = makeService()
+    service.handleSession(SESSION_RIFT)
+    const banned = { ...SESSION_BASE, bans: { myTeamBans: [1], theirTeamBans: [], numBans: 1 } } as never
+    service.handleSession(banned)
+    expect(events).toHaveLength(2)
+  })
+
+  it('离开选人（状态非 in-champ-select）→ 发终态 none，重进可重发', () => {
+    const { service, events, source } = makeService()
+    service.start()
+    service.handleSession(SESSION_RIFT)
+    source.emitStatus('connected')
+    expect((events[events.length - 1] as { kind: string }).kind).toBe('none')
+    // 离开时清空去重键：同一会话再次进入应重发（而非被去重吞掉）
+    service.handleSession(SESSION_RIFT)
+    expect((events[events.length - 1] as { kind: string }).kind).toBe('rift')
+    service.stop()
+    expect(source.stopSpy).toHaveBeenCalled()
   })
 })

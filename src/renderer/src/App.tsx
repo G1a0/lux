@@ -64,7 +64,7 @@ export function App(): React.JSX.Element {
       <Onboarding
         onDone={() => {
           void bridge.setConfig({ onboarded: true })
-          setOnboarded(true)
+          bridge.setPinned(true) // 首启后保持可见，直到用户隐藏或进入/离开选人
           setView('main')
         }}
       />

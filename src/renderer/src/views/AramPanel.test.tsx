@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AramPanel } from './AramPanel'
 import type { UiSnapshot } from '../bridge'
 
@@ -50,5 +50,38 @@ describe('AramPanel', () => {
     expect(screen.getByText(/掷骰子/)).toBeTruthy()
     expect(screen.getByText(/符文：暂无/)).toBeTruthy()
     expect(screen.getByText(/技能：暂无/)).toBeTruthy()
+  })
+
+  it('一键应用按钮调用桥（与主面板一致）', async () => {
+    const applyRunes = vi.fn(async () => ({ ok: true }))
+    const applySpells = vi.fn(async () => true)
+    ;(window as unknown as { lux: unknown }).lux = { applyRunes, applySpells }
+    render(<AramPanel snapshot={snap} />)
+    const runesBtn = screen.getByText('一键应用符文')
+    const spellsBtn = screen.getByText('携带技能')
+    expect((runesBtn as HTMLButtonElement).disabled).toBe(false)
+    expect((spellsBtn as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(runesBtn)
+    expect(applyRunes).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText('符文已应用')).toBeTruthy()
+  })
+
+  it('无符文/技能时应用按钮禁用', () => {
+    const reroll: UiSnapshot = {
+      kind: 'aram',
+      queueId: 450,
+      aram: {
+        action: 'keep',
+        reason: '留着',
+        current: { championId: 711, score: 49.3, factors: [], dominantFactor: null, reason: '', partialData: false },
+        bench: [],
+        swapTo: null,
+        runes: null,
+        spells: null,
+      },
+    }
+    render(<AramPanel snapshot={reroll} />)
+    expect((screen.getByText('一键应用符文') as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByText('携带技能') as HTMLButtonElement).disabled).toBe(true)
   })
 })

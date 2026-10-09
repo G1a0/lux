@@ -9,8 +9,8 @@ export interface RunestSpellDisplay {
 }
 
 export type AdvicePayload =
-  | { kind: 'rift'; queueId: number; advice: RiftAdvice }
-  | { kind: 'aram'; queueId: number; aram: AramJudgeResult }
+  | { kind: 'rift'; queueId: number; advice: RiftAdvice; names?: Record<number, string> }
+  | { kind: 'aram'; queueId: number; aram: AramJudgeResult; names?: Record<number, string> }
   | { kind: 'unsupported'; queueId: number }
   | { kind: 'none' }
 

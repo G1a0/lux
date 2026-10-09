@@ -31,6 +31,7 @@ const bridge = {
   getConfig: () => ipcRenderer.invoke('lux:get-config'),
   setConfig: (patch: unknown) => ipcRenderer.invoke('lux:set-config', patch),
   setWindowState: (state: string) => ipcRenderer.send('lux:set-window-state', state),
+  setPinned: (pinned: boolean) => ipcRenderer.send('lux:set-pinned', pinned),
   getManifest: () => ipcRenderer.invoke('lux:get-manifest'),
   syncNow: () => ipcRenderer.invoke('lux:sync-now'),
   quit: () => ipcRenderer.invoke('lux:quit'),

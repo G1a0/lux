@@ -17,6 +17,7 @@ export interface UiBridge {
   getConfig(): Promise<Record<string, unknown>>
   setConfig(patch: Record<string, unknown>): Promise<Record<string, unknown>>
   setWindowState(state: string): void
+  setPinned(pinned: boolean): void
   getManifest(): Promise<Record<string, unknown> | null>
   syncNow(): Promise<Record<string, unknown>>
   onSyncProgress(cb: (done: number, total: number) => void): () => void
@@ -46,6 +47,7 @@ export function createInertBridge(): UiBridge {
     getConfig: async () => ({}),
     setConfig: async p => p,
     setWindowState: () => {},
+    setPinned: () => {},
     getManifest: async () => null,
     syncNow: async () => ({ status: 'unavailable' }),
     onSyncProgress: () => () => {},

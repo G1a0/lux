@@ -9,6 +9,15 @@ import type { AramJudgeResult, RiftAdvice } from '../../shared/engine/types'
 import type { AppConfig, ConfigStore } from './config'
 import type { AdvicePayload, ManifestInfo, SyncOutcome } from '../ipc-types'
 
+/** queueId → 模式中文名（符文页命名/界面标题用）；未知队列回退 '对局' */
+const MODE_LABELS: Record<number, string> = {
+  400: '征召',
+  420: '排位',
+  430: '匹配',
+  440: '排位',
+  450: '大乱斗',
+}
+
 export interface AdviceSource {
   start(): void
   stop(): void
@@ -208,8 +217,9 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
             ? lastPayload.aram.runes
             : null
       if (!runes) return { ok: false, reason: '当前没有可应用的符文' }
+      const queueId = lastPayload.kind === 'rift' || lastPayload.kind === 'aram' ? lastPayload.queueId : 0
       return applyRunePage(http, {
-        name: lastPayload.kind === 'aram' ? '大乱斗' : '排位',
+        name: MODE_LABELS[queueId] ?? '对局',
         keystoneId: runes.keystoneId,
         subStyleCode: runes.subStyleCode ?? 'jj',
         runeIds: runes.runeIds,

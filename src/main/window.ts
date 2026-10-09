@@ -42,7 +42,9 @@ export function createWindowManager(config: ConfigStore): WindowManager {
 
   return {
     create() {
-      const saved = config.get().windowPos
+      // 磁盘 JSON 不受类型保护：仅接受有限数值坐标，否则回退默认锚点
+      const rawSaved = config.get().windowPos
+      const saved = rawSaved && Number.isFinite(rawSaved.x) && Number.isFinite(rawSaved.y) ? rawSaved : null
       const size = { width: SIZES.main[0], height: SIZES.main[1] }
       const anchor = saved ?? { x: 24, y: 120 }
       const workArea = screen.getDisplayMatching({ x: anchor.x, y: anchor.y, width: 1, height: 1 }).workArea
@@ -80,7 +82,15 @@ export function createWindowManager(config: ConfigStore): WindowManager {
         if (snapped.x !== x || snapped.y !== y) win.setPosition(snapped.x, snapped.y)
         config.set({ windowPos: snapped })
       }
-      win.on('moved', savePos)
+      // 拖动期间 'moved' 可能高频触发：200ms 尾部防抖，停止后只落盘一次
+      let saveTimer: ReturnType<typeof setTimeout> | null = null
+      win.on('moved', () => {
+        if (saveTimer) clearTimeout(saveTimer)
+        saveTimer = setTimeout(() => {
+          saveTimer = null
+          if (win && !win.isDestroyed()) savePos()
+        }, 200)
+      })
       return win
     },
     setView(state) {

@@ -1,13 +1,6 @@
 // 三端共享的载荷/状态类型（main ↔ preload ↔ renderer）。
 import type { AramJudgeResult, RiftAdvice } from '../shared/engine/types'
 
-export interface RunestSpellDisplay {
-  keystoneId: number
-  runeIds: number[]
-  subStyleCode?: string
-  source: 'qq101' | 'builtin'
-}
-
 export type AdvicePayload =
   | { kind: 'rift'; queueId: number; advice: RiftAdvice; names?: Record<number, string> }
   | { kind: 'aram'; queueId: number; aram: AramJudgeResult; names?: Record<number, string> }

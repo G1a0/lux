@@ -112,6 +112,9 @@ if (!gotLock) {
       console.log('[screenshot] 已生成：', files.join(', '))
       app.exit(0)
     }
+  }).catch(error => {
+    console.error('[lux] 启动失败：', error)
+    app.quit()
   })
 
   app.on('window-all-closed', () => {

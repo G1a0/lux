@@ -4,6 +4,10 @@ import { getBridge, type UiSnapshot } from '../bridge'
 const SPELL_NAMES: Record<number, string> = {
   1: '净化', 3: '虚弱', 4: '闪现', 6: '疾跑', 7: '治疗', 11: '惩戒', 12: '传送', 14: '点燃', 21: '护盾', 32: '标记',
 }
+/** queueId → 模式中文名；未知队列回退 '对局' */
+const MODE_LABELS: Record<number, string> = {
+  400: '征召', 420: '排位', 430: '匹配', 440: '排位', 450: '大乱斗',
+}
 const KEYSTONES: Record<number, string> = {
   8005: '强攻', 8008: '致命节奏', 8010: '征服者', 8021: '迅捷步法',
   8112: '电刑', 8124: '掠食者', 8128: '黑暗收割', 9923: '丛刃',
@@ -77,7 +81,7 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
   return (
     <div className="panel drag-region">
       <div className="panel-title no-drag">
-        <span>Lux · 排位</span>
+        <span>Lux · {MODE_LABELS[snapshot.queueId] ?? '对局'}</span>
         <span className="panel-actions">
           <button onClick={onExpand} title="详情">▾</button>
           <button onClick={onSettings} title="设置">⚙</button>

@@ -132,7 +132,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       rosterTimer = setInterval(() => {
         if (running) void refreshRoster()
       }, 60_000)
-      // 启动即尝试一次同步 + 每 3 小时检查（同步器内部处理时段门控）
+      // 启动即尝试一次同步 + 每 3 小时检查（应用内随时可同步；时段门禁仅存在于开发工具）
       void this.syncNow()
       syncTimer = setInterval(() => {
         if (running) void this.syncNow()

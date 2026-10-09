@@ -15,7 +15,7 @@ export interface ManifestInfo {
 }
 
 export interface SyncOutcome {
-  /** 'blocked-timegate' | 'synced' | 'up-to-date' | 'partial' | 'failed' | … */
+  /** 'synced' | 'up-to-date' | 'partial' | 'failed' | 'blocked'（开发工具注入时段门禁时）| … */
   status: string
   blockedUntil?: string
   patch?: string | null

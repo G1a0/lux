@@ -1,4 +1,5 @@
-// 同步器：只在允许时段运行；按 版本+位置+英雄 增量抓取并写本地数据仓。
+// 同步器：按 版本+位置+英雄 增量抓取并写本地数据仓。
+// 时段门禁不属于本模块——由调用方注入（开发工具 sync-cli 传 isApiAllowed；应用运行时默认放行）。
 // 策略：tier 每次同步都重刷（便宜，5 个请求）；对位/协同按文件存在性跳过（贵）。
 import type { Qq101Lane } from '../positions'
 import { nextAllowedTime } from '../timegate'

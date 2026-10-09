@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { createApp } from './app'
-import { createConfigStore } from './config'
 import { createWindowManager, type WindowManager } from './window'
 import { captureAllViews } from './screenshot'
 
@@ -67,10 +66,9 @@ app.whenReady().then(async () => {
   if (UI_MOCK) {
     win = createMockWindow()
   } else {
-    const config = createConfigStore(app.getPath('userData'))
-    windows = createWindowManager(config)
-    win = windows.create()
     bundle = createApp()
+    windows = createWindowManager(bundle.config) // 共享同一 ConfigStore，勿再 new
+    win = windows.create()
     wireIpc(win, windows) // 先接 IPC，再启动服务：避免启动早期事件因监听未就位而丢失
     bundle.service.start()
   }

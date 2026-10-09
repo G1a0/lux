@@ -12,11 +12,13 @@ import { judgeAram } from '../../shared/engine/aram'
 import { createQq101Client } from '../../shared/qq101/client'
 import { syncRiftData } from '../../shared/qq101/sync'
 import { isApiAllowed, nextAllowedTime } from '../../shared/timegate'
-import { createConfigStore } from './config'
+import { createConfigStore, type ConfigStore } from './config'
 import { createCompanionService, type AdviceSource, type CompanionService } from './service'
 
 export interface AppBundle {
   service: CompanionService
+  /** 全应用共享的配置实例（窗口管理器与设置页必须共用，避免双实例互相覆盖） */
+  config: ConfigStore
   dataRoot: string
   configDir: string
 }
@@ -97,7 +99,7 @@ export function createAppWithPaths(
     manifestReader: () => warehouse.readManifest(),
   })
 
-  return { service, dataRoot: paths.dataRoot, configDir: paths.configDir }
+  return { service, config, dataRoot: paths.dataRoot, configDir: paths.configDir }
 }
 
 export function createApp(): AppBundle {

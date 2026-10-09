@@ -2093,6 +2093,11 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
   const bridge = getBridge()
   const [applyMsg, setApplyMsg] = useState<string | null>(null)
 
+  // 快照变化（换英雄/重算）时清除上一次的应用反馈
+  useEffect(() => {
+    setApplyMsg(null)
+  }, [snapshot])
+
   if (!snapshot || snapshot.kind === 'none') {
     return (
       <div className="panel drag-region">

@@ -12,6 +12,7 @@ import { judgeAram } from '../../shared/engine/aram'
 import { createQq101Client } from '../../shared/qq101/client'
 import { resolvePopulatedPatch, syncRiftData } from '../../shared/qq101/sync'
 import { createConfigStore, type ConfigStore } from './config'
+import { bootstrapDataRoot, resolveDataRoot } from './data-root'
 import { createCompanionService, type AdviceSource, type CompanionService } from './service'
 
 export interface AppBundle {
@@ -112,6 +113,18 @@ export function createAppWithPaths(
 
 export function createApp(): AppBundle {
   const configDir = app.getPath('userData')
-  const dataRoot = process.env.LUX_DATA_DIR ?? join(app.getPath('userData'), 'data')
+  const resolved = resolveDataRoot({
+    envDir: process.env.LUX_DATA_DIR,
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    userDataPath: app.getPath('userData'),
+  })
+  const legacy = join(app.getPath('userData'), 'data')
+  const dataRoot = bootstrapDataRoot({
+    dataRoot: resolved,
+    // 开发版无覆盖时 legacy === dataRoot（同一目录）：置 null，避免自拷贝
+    legacyDir: legacy === resolved ? null : legacy,
+    seedDir: app.isPackaged ? join(process.resourcesPath, 'data-seed') : null,
+  })
   return createAppWithPaths({ configDir, dataRoot })
 }

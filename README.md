@@ -47,13 +47,13 @@ npm run test       # 跑单元测试（vitest）
 npm run typecheck  # 类型检查
 npm run build      # 构建（electron-vite build，输出 out/）
 npm run dist       # 构建 + 打 Windows NSIS 安装包（见「构建备注（Linux）」）
-npm run sync       # 同步 101 数据到本地仓 ./data（仅允许窗口：工作日 12-14 点、18 点后、周末）
+npm run sync       # 同步 101 数据到本地仓 ./data（开发工具：工作日 9-12、14-18 禁窗）
 npx tsx scripts/recommend-cli.ts --root ./data rift   # 推荐引擎离线冒烟（rift|aram）
 npx tsx scripts/lux-dev-cli.ts --scenario draft --root ./data   # LCU 核心冒烟（Mock）
 npx tsx scripts/lux-dev-cli.ts --scenario aram --root ./data --apply  # 含符文/技能写入演示
 ```
 
-> ⚠️ 硬约束：工作日 09:00–12:00 与 14:00–18:00 不得调用任何外部 API（运行时与开发调试均是）。同步器与客户端均已内置时段门控。
+> ⚠️ 硬约束：开发工具（CLI 同步/抓样本）仍遵守工作日 9-12、14-18 禁窗；**应用运行时已不再限制，随时可同步**。
 
 ## 构建备注（Linux）
 

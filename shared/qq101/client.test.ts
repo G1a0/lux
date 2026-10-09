@@ -70,6 +70,13 @@ describe('createQq101Client', () => {
     await expect(client.getTierList('16.19', 'ALL')).rejects.toBeInstanceOf(ApiTimeBlockedError)
   })
 
+  it('未注入 isAllowed 时默认放行（应用场景）', async () => {
+    const calls: string[] = []
+    const client = createQq101Client({ fetchImpl: okFetch(versionlistFixture, calls) })
+    expect(await client.getPatch()).toBe('16.19')
+    expect(calls).toHaveLength(1)
+  })
+
   it('请求失败返回 null', async () => {
     const fetchImpl = vi.fn(async () => { throw new Error('offline') }) as unknown as typeof fetch
     const client = createQq101Client({ fetchImpl, isAllowed: () => true })

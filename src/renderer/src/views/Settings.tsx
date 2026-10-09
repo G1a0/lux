@@ -34,14 +34,9 @@ export function Settings({ onClose }: SettingsProps): React.JSX.Element {
 
   async function onSync(): Promise<void> {
     setSyncMsg('同步中…')
-    const result = (await bridge.syncNow()) as { status: string; blockedUntil?: string }
-    if (result.status === 'blocked-timegate') {
-      const until = result.blockedUntil ? new Date(result.blockedUntil).toLocaleString() : ''
-      setSyncMsg(`处于时段限制内（工作日 9-12 / 14-18 禁止联网），下个可同步时间：${until}`)
-    } else {
-      setSyncMsg(`同步结束：${result.status}`)
-      setManifest(await bridge.getManifest())
-    }
+    const result = (await bridge.syncNow()) as { status: string }
+    setSyncMsg(`同步结束：${result.status}`)
+    setManifest(await bridge.getManifest())
   }
 
   if (!cfg) return <div className="panel">加载中…</div>

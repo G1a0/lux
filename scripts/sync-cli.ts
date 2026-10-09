@@ -31,7 +31,7 @@ async function main(): Promise<void> {
     process.exit(2)
   }
 
-  const client = createQq101Client({ minIntervalMs: interval })
+  const client = createQq101Client({ minIntervalMs: interval, isAllowed: isApiAllowed })
   const warehouse = createWarehouse(root)
   console.log(`[sync] 数据目录：${root}，位置：${lanes.join(',')}${limit ? `，每位置英雄上限：${limit}` : ''}（间隔 ${interval}ms，并发 ${concurrency}）${version ? `，固定版本：${version}` : ''}`)
 

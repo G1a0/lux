@@ -11,7 +11,6 @@ import { recommendRift } from '../../shared/engine/recommend'
 import { judgeAram } from '../../shared/engine/aram'
 import { createQq101Client } from '../../shared/qq101/client'
 import { resolvePopulatedPatch, syncRiftData } from '../../shared/qq101/sync'
-import { isApiAllowed, nextAllowedTime } from '../../shared/timegate'
 import { createConfigStore, type ConfigStore } from './config'
 import { createCompanionService, type AdviceSource, type CompanionService } from './service'
 
@@ -86,18 +85,20 @@ export function createAppWithPaths(
       return judgeAram(input, datasetRef.current)
     },
     syncRunner: async onProgress => {
-      const now = new Date()
-      if (!isApiAllowed(now)) {
-        return { status: 'blocked-timegate', patch: null, blockedUntil: nextAllowedTime(now).toISOString() }
-      }
-      const client = createQq101Client()
+      const client = createQq101Client({ minIntervalMs: 500 })
       let patch: string | null = null
       try {
         patch = await resolvePopulatedPatch(client)
       } catch {
         return { status: 'failed', patch: null }
       }
-      const result = await syncRiftData({ client, warehouse, onProgress, patchOverride: patch ?? undefined })
+      const result = await syncRiftData({
+        client,
+        warehouse,
+        onProgress,
+        concurrency: 3,
+        patchOverride: patch ?? undefined,
+      })
       if (result.patch) rebuildDataset() // 同步成功 → 数据仓就绪/更新：重建引擎数据（修复首启竞态）
       return { status: result.status, patch: result.patch }
     },

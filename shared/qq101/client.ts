@@ -1,6 +1,5 @@
 // Node 版 101 客户端：可注入 fetch / 时段门控 / 请求节流。
 // 时段禁止时抛 ApiTimeBlockedError（绝不静默吞掉）；其他网络错误返回 null。
-import { isApiAllowed } from '../timegate'
 import type { Qq101Lane } from '../positions'
 import { aramOverviewUrl, RIFT_PATH, riftUrl, versionsUrl } from './endpoints'
 import {
@@ -49,7 +48,8 @@ export interface CreateQq101ClientOptions {
 
 export function createQq101Client(options: CreateQq101ClientOptions = {}): Qq101Client {
   const fetchImpl = options.fetchImpl ?? fetch
-  const allowed = options.isAllowed ?? isApiAllowed
+  // 默认放行：应用运行时随时可同步；时段门禁由开发工具显式注入（见 sync-cli）
+  const allowed = options.isAllowed ?? (() => true)
   const now = options.now ?? (() => new Date())
   const timeoutMs = options.timeoutMs ?? 3000
   const minIntervalMs = options.minIntervalMs ?? 150

@@ -104,6 +104,18 @@ describe('MainPanel', () => {
     expect(await screen.findByText(/lockfile 是空的（0 字节，最后修改 2026\/01\/05 09:08）——客户端可能没在运行/)).toBeTruthy()
   })
 
+  it('已连接且 lockDir 为空串（凭据来自进程命令行）→ 展示来源提示而非常见路径未命中', async () => {
+    renderWithLcuInfo(waitingInfo({ status: 'connected', lockDir: '', port: 54321 }))
+    expect(await screen.findByText(/（来自客户端进程命令行）/)).toBeTruthy()
+    expect(screen.queryByText(/已尝试的常见路径均未命中/)).toBeNull()
+    expect(await screen.findByText(/端口：54321/)).toBeTruthy()
+  })
+
+  it('lockDir 非空时展示实际目录', async () => {
+    renderWithLcuInfo(waitingInfo({ status: 'connected', lockDir: 'D:\\WeGameApps\\英雄联盟\\LeagueClient' }))
+    expect(await screen.findByText(/客户端目录：D:\\WeGameApps\\英雄联盟\\LeagueClient/)).toBeTruthy()
+  })
+
   it('展示进程探测摘要（自动探测行；waiting 且有 processNote 时）', async () => {
     renderWithLcuInfo(waitingInfo({ processNote: '未发现正在运行的 LeagueClientUx / LeagueClient 进程' }))
     expect(await screen.findByText(/自动探测：未发现正在运行的 LeagueClientUx \/ LeagueClient 进程/)).toBeTruthy()

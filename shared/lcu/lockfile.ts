@@ -133,7 +133,61 @@ function parseWmicProcessList(raw: string): Array<{ pid: number | null; exePath:
         commandLine: record.CommandLine || null,
       }
     })
-    .filter(item => item.exePath !== null || item.commandLine !== null)
+    // 有 pid 但字段全空的块也要保留：权限受限进程正是这种形态（rawCount 靠它区分「没有进程」与「有进程读不到」）
+    .filter(item => item.pid !== null || item.exePath !== null || item.commandLine !== null)
+}
+
+/** 解析宽查输出（`Get-CimInstance Win32_Process` 按名称匹配后仅取 Name）：单对象/数组兼容；空串/坏 JSON → []。 */
+export function parseBroadProcessNames(raw: string): string[] {
+  if (raw.trim() === '') return []
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  const items = Array.isArray(parsed) ? parsed : [parsed]
+  return items.flatMap(item => {
+    const name = item !== null && typeof item === 'object' ? (item as Record<string, unknown>).Name : null
+    return typeof name === 'string' ? [name] : []
+  })
+}
+
+/** 宽查：列出名称含 league/riot 的进程名（仅精确查询 0 结果时的诊断用；**不取命令行，防泄露 token**）。失败 → null。 */
+function probeBroadProcessNames(): string[] | null {
+  const psCommand = `[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'league|riot' } | Select-Object ProcessId,Name | ConvertTo-Json -Compress`
+  try {
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', psCommand], { timeout: 4000, windowsHide: true }).toString()
+    return parseBroadProcessNames(output)
+  } catch {
+    return null
+  }
+}
+
+/** 组装进程探测诊断文案（纯函数便于测试；**输出绝不包含 token 或命令行原文**）。 */
+export function buildProcessProbeNote(input: {
+  /** 精确查询解析出的原始条目数（映射丢弃前）：>0 但 entries 空 = 有进程但读不到字段（典型：权限受限） */
+  rawCount: number
+  entries: ProcessClientEntry[]
+  /** null = 宽查未执行/失败（旧「未发现」文案）；[] = 宽查执行但没扫到 */
+  broadNames: string[] | null
+  /** 两种探测方法都失败时的错误摘要 */
+  error: string | null
+}): string {
+  const { rawCount, entries, broadNames, error } = input
+  if (error !== null) return `进程探测失败：${error.slice(0, 80)}`
+  if (rawCount === 0) {
+    if (broadNames === null) return '未发现正在运行的 LeagueClientUx / LeagueClient 进程'
+    return broadNames.length > 0
+      ? `未发现 LeagueClientUx / LeagueClient 进程（扫到名称含 league/riot 的进程：${broadNames.slice(0, 6).join('、')}）`
+      : '未发现 LeagueClientUx / LeagueClient 进程（名称含 league/riot 的进程也没有）'
+  }
+  if (entries.length === 0) {
+    return `发现 ${rawCount} 个客户端进程，但无法读取其路径与命令行（客户端可能以管理员权限运行）——请右键 Lux 图标「以管理员身份运行」后重试`
+  }
+  return entries.some(e => e.port !== null && e.password !== null)
+    ? `发现 ${entries.length} 个客户端进程（已解析连接参数）`
+    : `发现 ${entries.length} 个客户端进程（未解析出连接参数；若客户端以管理员运行，请以管理员运行 Lux）`
 }
 
 /**
@@ -160,21 +214,21 @@ export function probeClientProcessesByCommandLine(): ProcessProbeResult {
       ).toString()
       records = parseWmicProcessList(output)
     } catch (error) {
-      return { entries: [], note: '进程探测失败：' + String(error).slice(0, 80) }
+      return { entries: [], note: buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: null, error: String(error) }) }
     }
   }
+  const rawCount = records.length // 映射丢弃前：0 = 名都没扫到；>0 但 entries 空 = 有进程但字段读不到（权限受限）
   const entries: ProcessClientEntry[] = []
   for (const record of records) {
     const dir = record.exePath ? dirname(record.exePath) : null
     const creds = record.commandLine ? parseClientCommandLine(record.commandLine) : null
-    if (record.exePath === null && creds === null) continue // 既无路径又无凭据：无价值
+    if (record.exePath === null && creds === null) continue // 既无路径又无凭据：无价值（权限受限进程即此形态）
     entries.push({ dir, pid: record.pid, port: creds?.port ?? null, password: creds?.password ?? null })
   }
   entries.sort((a, b) => Number(b.port !== null) - Number(a.port !== null)) // 带凭据的排前面
-  const note = entries.length === 0
-    ? '未发现正在运行的 LeagueClientUx / LeagueClient 进程'
-    : `发现 ${entries.length} 个客户端进程（${entries.some(e => e.port !== null) ? '已解析连接参数' : '未解析出连接参数'}）`
-  return { entries, note }
+  // 精确查询 0 条：宽查名称含 league/riot 的进程（仅诊断：列名字，定位进程名不匹配；不取命令行）
+  const broadNames = rawCount === 0 ? probeBroadProcessNames() : null
+  return { entries, note: buildProcessProbeNote({ rawCount, entries, broadNames, error: null }) }
 }
 
 export interface DiscoverOptions {
@@ -248,8 +302,9 @@ export function discoverLockfile(options: DiscoverOptions = {}): DiscoveredLockf
       if (found) return found
     }
     // lockfile 空/缺失（国服新版客户端）但有命令行凭据：直接合成
-    if (entry.dir && entry.port !== null && entry.password !== null) {
-      return { processName: 'LeagueClient', pid: entry.pid ?? 0, port: entry.port, password: entry.password, protocol: 'https', dir: entry.dir }
+    // （连接只需 port+password；dir 仅展示/存活用——权限受限时读不到路径，可为空串）
+    if (entry.port !== null && entry.password !== null) {
+      return { processName: 'LeagueClient', pid: entry.pid ?? 0, port: entry.port, password: entry.password, protocol: 'https', dir: entry.dir ?? '' }
     }
   }
   return null

@@ -86,7 +86,7 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
             {lcuInfo.status === 'waiting' && lcuInfo.targetDir ? (
               <div className="dim">指定目录：{lcuInfo.targetDir}{targetDirHint(lcuInfo.targetProbe)}</div>
             ) : (
-              <div className="dim">客户端目录：{lcuInfo.lockDir ?? '已尝试的常见路径均未命中'}</div>
+              <div className="dim">客户端目录：{lcuInfo.lockDir === null ? '已尝试的常见路径均未命中' : (lcuInfo.lockDir || '（来自客户端进程命令行）')}</div>
             )}
             {lcuInfo.status === 'waiting' && lcuInfo.processNote && (
               <div className="dim">自动探测：{lcuInfo.processNote}</div>

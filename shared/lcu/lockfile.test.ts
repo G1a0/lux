@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
-  __resetLockfileScanCacheForTest, discoverLockfile, getLastProcessProbeInfo, normalizeLcuDir,
-  parseClientCommandLine, parseLockfile, parseProcessProbeJson, probeLcuDir,
+  __resetLockfileScanCacheForTest, buildProcessProbeNote, discoverLockfile, getLastProcessProbeInfo,
+  normalizeLcuDir, parseBroadProcessNames, parseClientCommandLine, parseLockfile, parseProcessProbeJson, probeLcuDir,
 } from './lockfile'
-import type { ProcessProbeResult } from './lockfile'
+import type { ProcessClientEntry, ProcessProbeResult } from './lockfile'
 
 describe('normalizeLcuDir', () => {
   it('去首尾空白与引号（英/中文）', () => {
@@ -99,6 +99,63 @@ describe('parseProcessProbeJson', () => {
   })
 })
 
+describe('parseBroadProcessNames', () => {
+  it('数组与单个对象（ConvertTo-Json 单结果时输出对象而非数组）', () => {
+    const two = [{ ProcessId: 8812, Name: 'LeagueClientUx.exe' }, { ProcessId: 12, Name: 'RiotClientServices.exe' }]
+    expect(parseBroadProcessNames(JSON.stringify(two))).toEqual(['LeagueClientUx.exe', 'RiotClientServices.exe'])
+    expect(parseBroadProcessNames(JSON.stringify({ ProcessId: 8812, Name: 'LeagueClientUx.exe' }))).toEqual(['LeagueClientUx.exe'])
+  })
+
+  it('空串/空白/垃圾文本 → []；Name 非 string 丢弃', () => {
+    expect(parseBroadProcessNames('')).toEqual([])
+    expect(parseBroadProcessNames('   ')).toEqual([])
+    expect(parseBroadProcessNames('不是 JSON')).toEqual([])
+    expect(parseBroadProcessNames(JSON.stringify([{ ProcessId: 1, Name: 42 }, { ProcessId: 2 }]))).toEqual([])
+  })
+})
+
+describe('buildProcessProbeNote', () => {
+  const dirOnly: ProcessClientEntry[] = [{ dir: 'D:\\x', pid: 1, port: null, password: null }]
+  const withCreds: ProcessClientEntry[] = [{ dir: 'D:\\x', pid: 1, port: 4321, password: 't' }]
+
+  it('探测失败 → 错误摘要（超长截断 80 字符）', () => {
+    expect(buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: null, error: 'spawn powershell.exe ENOENT' }))
+      .toBe('进程探测失败：spawn powershell.exe ENOENT')
+    expect(buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: null, error: 'x'.repeat(200) }))
+      .toBe('进程探测失败：' + 'x'.repeat(80))
+  })
+
+  it('精确查询 0 条、宽查未执行 → 旧「未发现」文案', () => {
+    expect(buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: null, error: null }))
+      .toBe('未发现正在运行的 LeagueClientUx / LeagueClient 进程')
+  })
+
+  it('精确查询 0 条、宽查扫到名称 → 列出名称（至多 6 个）', () => {
+    expect(buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: ['LeagueClientUx.exe'], error: null }))
+      .toBe('未发现 LeagueClientUx / LeagueClient 进程（扫到名称含 league/riot 的进程：LeagueClientUx.exe）')
+    const many = ['a.exe', 'b.exe', 'c.exe', 'd.exe', 'e.exe', 'f.exe', 'g.exe']
+    expect(buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: many, error: null }))
+      .toBe('未发现 LeagueClientUx / LeagueClient 进程（扫到名称含 league/riot 的进程：a.exe、b.exe、c.exe、d.exe、e.exe、f.exe）')
+  })
+
+  it('精确查询 0 条、宽查也没扫到 → 双重没有文案', () => {
+    expect(buildProcessProbeNote({ rawCount: 0, entries: [], broadNames: [], error: null }))
+      .toBe('未发现 LeagueClientUx / LeagueClient 进程（名称含 league/riot 的进程也没有）')
+  })
+
+  it('有进程但条目全被丢弃（权限受限读不到路径与命令行）→ 提示以管理员身份运行', () => {
+    expect(buildProcessProbeNote({ rawCount: 2, entries: [], broadNames: null, error: null }))
+      .toBe('发现 2 个客户端进程，但无法读取其路径与命令行（客户端可能以管理员权限运行）——请右键 Lux 图标「以管理员身份运行」后重试')
+  })
+
+  it('有条目但无凭据 → 提示管理员运行；有凭据 → 已解析', () => {
+    expect(buildProcessProbeNote({ rawCount: 1, entries: dirOnly, broadNames: null, error: null }))
+      .toBe('发现 1 个客户端进程（未解析出连接参数；若客户端以管理员运行，请以管理员运行 Lux）')
+    expect(buildProcessProbeNote({ rawCount: 1, entries: withCreds, broadNames: null, error: null }))
+      .toBe('发现 1 个客户端进程（已解析连接参数）')
+  })
+})
+
 describe('discoverLockfile', () => {
   const dirs: string[] = []
   afterEach(() => {
@@ -178,6 +235,16 @@ describe('discoverLockfile', () => {
       processProbe: () => ({ entries: [{ dir, pid: process.pid, port: 41234, password: 'tok-PW_1' }], note: '' }),
     })
     expect(found).toEqual({ processName: 'LeagueClient', pid: process.pid, port: 41234, password: 'tok-PW_1', protocol: 'https', dir })
+  })
+
+  it('entry 无目录（权限受限读不到路径）但有凭据（pid 存活）→ 合成结果 dir 为空串', () => {
+    const found = discoverLockfile({
+      envDir: undefined,
+      candidateDirs: [],
+      platform: 'win32',
+      processProbe: () => ({ entries: [{ dir: null, pid: process.pid, port: 4321, password: 'tok' }], note: '' }),
+    })
+    expect(found).toEqual({ processName: 'LeagueClient', pid: process.pid, port: 4321, password: 'tok', protocol: 'https', dir: '' })
   })
 
   it('已退出的进程条目整条跳过（即使目录里有合法 lockfile）', () => {

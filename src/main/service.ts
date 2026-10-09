@@ -62,6 +62,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
 
   let lastPayload: AdvicePayload = { kind: 'none' }
   let lastKey = ''
+  let lastSession: ChampSelectSession | null = null
   const caches: RosterCaches = { owned: [], proficiency: {} }
   let rosterTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setInterval> | null = null
@@ -90,10 +91,10 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
     }
   }
 
-  return {
+  const service: CompanionService = {
     start() {
       running = true
-      deps.source.onAdvice(snapshot => this.handleSession(snapshot.session))
+      deps.source.onAdvice(snapshot => service.handleSession(snapshot.session))
       deps.source.onStatus(status => statusHandlers.forEach(h => h(status)))
       deps.source.start()
       void refreshRoster()
@@ -113,14 +114,17 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       deps.source.stop()
     },
     handleSession(session) {
+      lastSession = session
       const config = deps.config.get()
       const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}`
-      // 支持判定走真实映射（与下游 compute 同源）；两者皆 null 才视为不支持
-      const aramInput = mapAramInput(session)
-      const isAram = session.queueId === 450
-      const supported = aramInput !== null || mapRiftContext(session) !== null
       if (key === lastKey) return
       lastKey = key
+
+      const aramInput = mapAramInput(session)
+      const isAram = session.queueId === 450
+      if (isAram && !aramInput) return emit({ kind: 'none' }) // 大乱斗尚未分配到英雄：等待态，勿误报"不支持"
+      // 支持判定走真实映射（与下游 compute 同源）；两者皆 null 才视为不支持
+      const supported = aramInput !== null || mapRiftContext(session) !== null
 
       if (isAram && aramInput) {
         if (!config.modes.aram) return emit({ kind: 'none' })
@@ -182,7 +186,15 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       return carrySpells(http, spells.spellIds)
     },
     getConfig: () => deps.config.get(),
-    setConfig: patch => deps.config.set(patch),
+    setConfig(patch) {
+      const next = deps.config.set(patch)
+      // 开关切换需即时反映：清 key 后按最近一次会话重算并重发快照
+      if (lastSession && (patch.modes !== undefined || patch.ownedFilter !== undefined)) {
+        lastKey = ''
+        service.handleSession(lastSession)
+      }
+      return next
+    },
     getManifest: () => deps.manifestReader?.() ?? null,
     async syncNow() {
       try {
@@ -193,4 +205,5 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       }
     },
   }
+  return service
 }

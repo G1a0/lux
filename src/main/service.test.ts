@@ -168,4 +168,50 @@ describe('CompanionService', () => {
       [2, 2],
     ])
   })
+
+  it('大乱斗未分配英雄（championId 0）→ 等待态 none，而非 unsupported', () => {
+    const { service } = makeService()
+    const seen: { kind: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string }))
+    service.handleSession({ ...SESSION_BASE, queueId: 450 } as never) // SESSION_BASE 本地玩家 championId 为 0
+    expect(seen[0].kind).toBe('none')
+  })
+
+  it('切换模式开关立即重发快照', () => {
+    const service = createCompanionService({
+      source: fakeSource(),
+      config: fakeConfig(),
+      computeRift: () => ({
+        primary: {
+          championId: 1,
+          reason: 'x',
+          score: 50,
+          factors: [],
+          dominantFactor: null,
+          partialData: false,
+        },
+        alternates: [],
+        runes: null,
+        spells: null,
+        ruleMode: false,
+      }),
+      computeAram: () => ({
+        action: 'keep',
+        reason: 'y',
+        // makeService 的桩经 as 断言省字段；此处直接写全以满足强类型 AramJudgeResult
+        current: { championId: 1, score: 50, reason: '', factors: [], dominantFactor: null, partialData: false },
+        bench: [],
+        swapTo: null,
+        runes: null,
+        spells: null,
+      }),
+      syncRunner: async () => ({ status: 'synced' }),
+      dataRoot: '/tmp/lux-data',
+    })
+    const seen: { kind: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string }))
+    service.handleSession(SESSION_RIFT)
+    service.setConfig({ modes: { rift: false, aram: true } })
+    expect(seen.map(s => s.kind)).toEqual(['rift', 'none'])
+  })
 })

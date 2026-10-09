@@ -30,7 +30,8 @@ declare global {
 }
 
 export function getBridge(): UiBridge {
-  return (window.lux as UiBridge | undefined) ?? createInertBridge()
+  // 合并式降级：preload 尚未暴露全部方法时（如 Task 6 前的阶段），缺的调用回退到惰性实现而非抛错
+  return { ...createInertBridge(), ...(window.lux as Partial<UiBridge> | undefined) }
 }
 
 /** 无 preload 时（浏览器预览/未注入）的安全降级：不抛错、不动作。 */

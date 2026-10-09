@@ -17,4 +17,12 @@ describe('bridge', () => {
     delete (window as { lux?: unknown }).lux
     expect(() => createInertBridge()).not.toThrow()
   })
+
+  it('部分注入的 window.lux：未提供的方法回退惰性实现（不抛错）', async () => {
+    ;(window as unknown as { lux: unknown }).lux = { ping: () => 'pong' }
+    const b = getBridge()
+    expect(await b.applySpells()).toBe(false)
+    expect(await b.applyRunes()).toEqual({ ok: false, reason: '未连接应用主进程' })
+    delete (window as { lux?: unknown }).lux
+  })
 })

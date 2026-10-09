@@ -37,6 +37,18 @@ describe('ChampIcon', () => {
     expect(container.querySelector('img')).toBeNull()
   })
 
+  it('IPC 拒绝（无 handler）→ 静默降级不渲染、不抛', async () => {
+    const getChampionIcon = vi.fn(async () => {
+      throw new Error('No handler registered')
+    })
+    setBridge(getChampionIcon)
+    const { container } = render(<ChampIcon id={22} />)
+    await waitFor(() => {
+      expect(getChampionIcon).toHaveBeenCalledWith(22)
+    })
+    expect(container.querySelector('img')).toBeNull()
+  })
+
   it('active 时带 champ-icon-active 高亮类', async () => {
     setBridge(async () => 'data:image/png;base64,AAAA')
     const { container } = render(<ChampIcon id={22} active />)

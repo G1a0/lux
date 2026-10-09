@@ -20,6 +20,9 @@ export function ChampIcon({ id, size = 28, active = false }: ChampIconProps): Re
       .then(u => {
         if (alive) setUrl(u)
       })
+      .catch(() => {
+        // IPC 失败（如 mock 模式无 handler）：静默降级为无头像
+      })
     return () => {
       alive = false
     }

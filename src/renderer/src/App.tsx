@@ -11,6 +11,9 @@ export function App(): React.JSX.Element {
     })
   }, [])
 
+  // 托盘「设置」等主进程指令：切换视图（Task 9 重写 App 后仍沿用此通道）
+  useEffect(() => window.lux?.onOpenView?.(v => setView(v)), [])
+
   if (view === 'none') {
     return <div className="placeholder">Lux 启动中…</div>
   }

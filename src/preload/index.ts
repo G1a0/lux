@@ -16,6 +16,11 @@ const bridge = {
     ipcRenderer.on('lux:mock-view', h)
     return () => ipcRenderer.removeListener('lux:mock-view', h)
   },
+  onOpenView: (cb: (view: string) => void) => {
+    const h = (_e: unknown, view: string) => cb(view)
+    ipcRenderer.on('lux:open-view', h)
+    return () => ipcRenderer.removeListener('lux:open-view', h)
+  },
   onSyncProgress: (cb: (d: number, t: number) => void) => {
     const h = (_e: unknown, d: number, t: number) => cb(d, t)
     ipcRenderer.on('lux:sync-progress', h)

@@ -1252,6 +1252,8 @@ import { createCompanionService, type AdviceSource, type CompanionService } from
 
 export interface AppBundle {
   service: CompanionService
+  /** 全应用共享的配置实例（窗口管理器与设置页必须共用，避免双实例互相覆盖） */
+  config: ConfigStore
   dataRoot: string
   configDir: string
 }
@@ -1332,7 +1334,7 @@ export function createAppWithPaths(
     manifestReader: () => warehouse.readManifest(),
   })
 
-  return { service, dataRoot: paths.dataRoot, configDir: paths.configDir }
+  return { service, config, dataRoot: paths.dataRoot, configDir: paths.configDir }
 }
 
 export function createApp(): AppBundle {
@@ -1341,6 +1343,8 @@ export function createApp(): AppBundle {
   return createAppWithPaths({ configDir, dataRoot })
 }
 ```
+
+（`ConfigStore` 类型需在此文件 import：`import { createConfigStore, type ConfigStore } from './config'`。）
 
 - [ ] **Step 2: 写测试 `src/main/app.test.ts`（注入 fake source，不依赖 Electron/advisor）**
 
@@ -1687,11 +1691,10 @@ export function createWindowManager(config: ConfigStore): WindowManager {
 
 ```ts
 import { createWindowManager } from './window'
-import { createConfigStore } from './config'
 
-// app.whenReady 内：
-const config = createConfigStore(app.getPath('userData'))
-const windows = createWindowManager(config)
+// app.whenReady 内（真实路径）：
+const bundle = createApp()
+const windows = createWindowManager(bundle.config) // 共享同一 ConfigStore，勿再 new
 const win = windows.create()
 ...
 ipcMain.on('lux:set-window-state', (_e, state: string) => windows.setView(state))

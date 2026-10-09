@@ -311,7 +311,8 @@ declare global {
 }
 
 export function getBridge(): UiBridge {
-  return (window.lux as UiBridge | undefined) ?? createInertBridge()
+  // 合并式降级：preload 尚未暴露全部方法时（如 Task 6 前的阶段），缺的调用回退到惰性实现而非抛错
+  return { ...createInertBridge(), ...(window.lux as Partial<UiBridge> | undefined) }
 }
 
 /** 无 preload 时（浏览器预览/未注入）的安全降级：不抛错、不动作。 */
@@ -401,11 +402,14 @@ const ARAM_SNAPSHOT = {
     reason: '建议换 艾希：版本强势：大乱斗胜率 54.6%',
     swapTo: { championId: 22, score: 66.4, reason: '版本强势：大乱斗胜率 54.6%', factors: [], dominantFactor: 'strength', partialData: false },
     current: { championId: 711, score: 49.3, reason: '操作上手简单，适合新手', factors: [], dominantFactor: 'beginner', partialData: false },
-    bench: [],
+    bench: [
+      { championId: 22, score: 66.4, reason: '版本强势：大乱斗胜率 54.6%', factors: [], dominantFactor: 'strength', partialData: false },
+      { championId: 57, score: 52.0, reason: '操作上手简单，适合新手', factors: [], dominantFactor: 'beginner', partialData: false },
+    ],
     runes: { keystoneId: 8008, runeIds: [8008, 8009, 9103, 8014, 8304, 8345, 5005, 5008, 5001], subStyleCode: 'qd', source: 'builtin' },
     spells: { spellIds: [4, 32], source: 'builtin' },
   },
-  names: { 711: '薇克丝', 22: '艾希' },
+  names: { 711: '薇克丝', 22: '艾希', 57: '茂凯' },
 }
 
 export function mockSnapshotFor(view: MockView): unknown {

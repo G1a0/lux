@@ -2244,21 +2244,31 @@ describe('AramPanel', () => {
 
 - [ ] **Step 2: 实现三个视图**
 
-`ExpandedPanel.tsx`：
+`ExpandedPanel.tsx`（含返回入口——避免展开后无路可退）：
 
 ```tsx
 import type { UiSnapshot } from '../bridge'
 
-export function ExpandedPanel({ snapshot }: { snapshot: UiSnapshot }): React.JSX.Element {
+export interface ExpandedPanelProps {
+  snapshot: UiSnapshot
+  onBack(): void
+}
+
+export function ExpandedPanel({ snapshot, onBack }: ExpandedPanelProps): React.JSX.Element {
   if (snapshot.kind !== 'rift') return <div className="panel">…</div>
   return (
     <div className="panel drag-region">
-      <div className="panel-title no-drag"><span>候选详情</span></div>
+      <div className="panel-title no-drag">
+        <span>候选详情</span>
+        <span className="panel-actions"><button onClick={onBack} title="返回">‹</button></span>
+      </div>
       <ul className="alt-list">
         {snapshot.advice.alternates.map(alt => (
           <li key={alt.championId}>
-            <span className="champ-name">{snapshot.names?.[alt.championId] ?? `英雄${alt.championId}`}</span>
-            <span className="score">{alt.score}</span>
+            <div className="alt-head">
+              <span className="champ-name">{snapshot.names?.[alt.championId] ?? `英雄${alt.championId}`}</span>
+              <span className="score">{alt.score}</span>
+            </div>
             <div className="reason">{alt.reason}{alt.partialData ? '（部分数据缺失）' : ''}</div>
           </li>
         ))}
@@ -2268,6 +2278,8 @@ export function ExpandedPanel({ snapshot }: { snapshot: UiSnapshot }): React.JSX
   )
 }
 ```
+
+（App.tsx 中相应改为 `<ExpandedPanel snapshot={snapshot} onBack={() => setView('main')} />`。）
 
 `AramPanel.tsx`：
 

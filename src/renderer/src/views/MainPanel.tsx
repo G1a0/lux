@@ -62,7 +62,11 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
             {lcuInfo.status === 'waiting' && (
               <div className="dim">若长时间未发现，可在设置中手动指定客户端目录。</div>
             )}
-            <div className="dim">客户端目录：{lcuInfo.lockDir ?? '已尝试的常见路径均未命中'}</div>
+            {lcuInfo.status === 'waiting' && lcuInfo.targetDir ? (
+              <div className="dim">指定目录：{lcuInfo.targetDir}（未在该目录找到 lockfile——请确认这个文件夹内「直接」有一个名为 lockfile 的文件，而不是再深一层）</div>
+            ) : (
+              <div className="dim">客户端目录：{lcuInfo.lockDir ?? '已尝试的常见路径均未命中'}</div>
+            )}
             <div className="dim">端口：{lcuInfo.port ?? '未知'}</div>
             {lcuInfo.lastError && <div className="dim">{lcuInfo.lastError.slice(0, 120)}</div>}
           </>

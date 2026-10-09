@@ -56,7 +56,8 @@ export function createAppWithPaths(
   } else {
     const advisor = createLcuAdvisor({
       compute: () => ({ kind: 'none', sessionQueueId: 0 }) as never,
-      lcuDirOverride: config.get().lcuDir || undefined,
+      // getter：设置页保存后无需重启，advisor 下个连接尝试自动读到新目录
+      lcuDirOverride: () => config.get().lcuDir || undefined,
     })
     source = {
       start: () => advisor.start(),

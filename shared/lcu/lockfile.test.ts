@@ -2,7 +2,32 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { __resetLockfileScanCacheForTest, discoverLockfile, parseLockfile } from './lockfile'
+import { __resetLockfileScanCacheForTest, discoverLockfile, normalizeLcuDir, parseLockfile } from './lockfile'
+
+describe('normalizeLcuDir', () => {
+  it('去首尾空白与引号（英/中文）', () => {
+    expect(normalizeLcuDir('  "D:\\WeGameApps\\英雄联盟\\LeagueClient"  ')).toBe('D:\\WeGameApps\\英雄联盟\\LeagueClient')
+    expect(normalizeLcuDir('“D:/Games/LoL”')).toBe('D:/Games/LoL')
+    expect(normalizeLcuDir("‘D:/Games/LoL’")).toBe('D:/Games/LoL')
+  })
+
+  it('去尾部斜杠（反斜杠/正斜杠/多重）', () => {
+    expect(normalizeLcuDir('D:\\WeGameApps\\英雄联盟\\LeagueClient\\')).toBe('D:\\WeGameApps\\英雄联盟\\LeagueClient')
+    expect(normalizeLcuDir('D:/Games/LoL///')).toBe('D:/Games/LoL')
+  })
+
+  it('误填 lockfile 文件路径 → 取父目录（discoverLockfile 端到端同款规整）', () => {
+    expect(normalizeLcuDir('D:\\WeGameApps\\英雄联盟\\LeagueClient\\lockfile')).toBe('D:\\WeGameApps\\英雄联盟\\LeagueClient')
+    expect(normalizeLcuDir('D:/Games/LoL/lockfile')).toBe('D:/Games/LoL')
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    try {
+      writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:3456:pw:https')
+      expect(discoverLockfile({ envDir: join(dir, 'lockfile') })?.port).toBe(3456)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('parseLockfile', () => {
   it('解析 5 段格式', () => {

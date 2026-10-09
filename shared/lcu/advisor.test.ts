@@ -78,6 +78,37 @@ describe('LcuAdvisor', () => {
     advisor.stop()
   })
 
+  it('lcuDirOverride 函数形式：start 后改变返回值即生效（设置页免重启）', async () => {
+    const mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: { '/lol-champ-select/v1/session': { json: fixture('session-draft-mid.json') } },
+    })
+    servers.push(mock)
+
+    let currentDir: string | undefined = undefined // 模拟设置页：初始未填 → 保存后填入
+    const snapshots: AdviceSnapshot[] = []
+    const advisor = createLcuAdvisor({
+      lcuDirOverride: () => currentDir,
+      discoverIntervalMs: 50,
+      debounceMs: 30,
+      compute: session => ({ kind: 'rift', sessionQueueId: session.queueId }),
+    })
+    try {
+      advisor.onAdvice(s => snapshots.push(s))
+      advisor.start()
+      await new Promise(r => setTimeout(r, 100))
+      expect(advisor.info().status).toBe('waiting') // 未指定目录时自动发现未命中
+      expect(advisor.info().targetDir).toBeNull()
+
+      currentDir = mock.lcuDir // 同一 advisor 实例，下一个 tick 自动读到新目录
+      await waitFor(() => (advisor.info().status === 'in-champ-select' ? true : null))
+      expect(advisor.info().targetDir).toBe(mock.lcuDir)
+      await waitFor(() => snapshots[0] ?? null) // 连接后建议照常产出
+    } finally {
+      advisor.stop()
+    }
+  })
+
   it('服务中断但 lockfile 仍在（客户端崩溃残留）→ 连续失败后自愈回等待态', async () => {
     const mock = await createMockLcu({
       certDir: CERT_DIR,

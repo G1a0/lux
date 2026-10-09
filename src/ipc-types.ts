@@ -27,4 +27,6 @@ export interface LcuInfo {
   lockDir: string | null
   port: number | null
   lastError: string | null
+  /** 当前手动指定的目录（正在探测的目标）；自动发现时为 null */
+  targetDir: string | null
 }

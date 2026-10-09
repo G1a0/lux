@@ -68,7 +68,7 @@ export function Settings({ onClose }: SettingsProps): React.JSX.Element {
         启用大乱斗换/留判定
       </label>
       <div className="cfg-section">
-        <div className="dim">游戏客户端目录（自动发现失败时手动指定；修改后重启 Lux 生效）</div>
+        <div className="dim">游戏客户端目录（自动发现失败时手动指定；保存后几秒内自动生效）</div>
         <div className="cfg-row no-drag">
           <input
             type="text"

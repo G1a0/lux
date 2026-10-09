@@ -31,6 +31,15 @@ const DEFAULT_CANDIDATES = [
   'F:/WeGameApps/英雄联盟/LeagueClient',
 ]
 
+/** 规整用户提供的目录：去首尾空白与引号（英/中文）、去尾斜杠、若误填了 lockfile 文件路径则取其父目录。 */
+export function normalizeLcuDir(raw: string): string {
+  let s = raw.trim()
+  s = s.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
+  s = s.replace(/[\\/]+$/g, '')
+  s = s.replace(/[\\/]lockfile$/i, '')
+  return s
+}
+
 export function parseLockfile(content: string): LcuLockfile | null {
   const fields = content.trim().split(':')
   if (fields.length !== 5) return null
@@ -96,7 +105,9 @@ function tryReadLockfile(dir: string): DiscoveredLockfile | null {
 }
 
 export function discoverLockfile(options: DiscoverOptions = {}): DiscoveredLockfile | null {
-  const envDir = options.envDir ?? process.env.LUX_LCU_DIR
+  // 用户手填路径常带引号/尾斜杠/误贴 lockfile 全路径：规整后再探测（自动发现路径不受影响）
+  const rawDir = options.envDir ?? process.env.LUX_LCU_DIR
+  const envDir = rawDir?.trim() ? normalizeLcuDir(rawDir) : undefined
   const dirs = envDir ? [envDir] : (options.candidateDirs ?? DEFAULT_CANDIDATES)
   for (const dir of dirs) {
     const found = tryReadLockfile(dir)

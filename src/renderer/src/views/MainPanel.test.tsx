@@ -34,7 +34,7 @@ describe('MainPanel', () => {
   it('无快照时展示 LCU 连接诊断（未发现文案 + 路径提示 + 最近错误）', async () => {
     ;(window as unknown as { lux: unknown }).lux = {
       onLcuInfo: (cb: (info: unknown) => void) => {
-        cb({ status: 'waiting', lockDir: null, port: null, lastError: 'connect ECONNREFUSED 127.0.0.1:54321' })
+        cb({ status: 'waiting', lockDir: null, port: null, lastError: 'connect ECONNREFUSED 127.0.0.1:54321', targetDir: null })
         return () => {}
       },
     }
@@ -42,6 +42,19 @@ describe('MainPanel', () => {
     expect(await screen.findByText(/未发现游戏客户端/)).toBeTruthy()
     expect(await screen.findByText(/已尝试的常见路径均未命中/)).toBeTruthy()
     expect(await screen.findByText(/connect ECONNREFUSED 127\.0\.0\.1:54321/)).toBeTruthy()
+  })
+
+  it('指定了目录但未命中时展示指定目录与排查提示（替代通用未命中文案）', async () => {
+    ;(window as unknown as { lux: unknown }).lux = {
+      onLcuInfo: (cb: (info: unknown) => void) => {
+        cb({ status: 'waiting', lockDir: null, port: null, lastError: null, targetDir: 'D:\\X\\LeagueClient' })
+        return () => {}
+      },
+    }
+    render(<MainPanel snapshot={null} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+    expect(await screen.findByText(/指定目录：D:\\X\\LeagueClient/)).toBeTruthy()
+    expect(await screen.findByText(/未在该目录找到 lockfile/)).toBeTruthy()
+    expect(screen.queryByText(/已尝试的常见路径均未命中/)).toBeNull()
   })
 
   it('一键应用按钮调用桥', async () => {

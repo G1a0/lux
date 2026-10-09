@@ -1,6 +1,6 @@
 // 编排：发现 lockfile → 连接（REST+WSS）→ 会话存在时防抖重算 → 回调建议；
 // 客户端消失/断线 → 退避重连、静默等待，不打扰用户。
-import { discoverLockfile } from './lockfile'
+import { discoverLockfile, normalizeLcuDir } from './lockfile'
 import { createLcuHttp, type LcuHttp } from './http'
 import { createLcuEventSocket, type LcuEventSocket } from './events'
 import { createLcuReaders, type LcuReaders } from './readers'
@@ -21,7 +21,8 @@ export type ComputeAdvice = (
 ) => Omit<AdviceSnapshot, 'session'> | Promise<Omit<AdviceSnapshot, 'session'>>
 
 export interface LcuAdvisorOptions {
-  lcuDirOverride?: string
+  /** 手动指定 lockfile 目录；函数形式支持动态读取（设置页改动免重启） */
+  lcuDirOverride?: string | (() => string | undefined)
   discoverIntervalMs?: number
   debounceMs?: number
   compute: ComputeAdvice
@@ -36,15 +37,25 @@ export interface LcuAdvisor {
   setLcuDirForTest(dir: string): void
   http(): LcuHttp | null
   readers(): LcuReaders | null
-  /** 连接诊断（UI 展示用）：当前状态、命中目录/端口、最近一次请求错误 */
-  info(): { status: AdvisorStatus; lockDir: string | null; port: number | null; lastError: string | null }
+  /** 连接诊断（UI 展示用）：当前状态、命中目录/端口、最近一次请求错误、当前指定目录（正在探测的目标，自动发现时为 null） */
+  info(): { status: AdvisorStatus; lockDir: string | null; port: number | null; lastError: string | null; targetDir: string | null }
 }
 
 export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
   const discoverIntervalMs = options.discoverIntervalMs ?? 5000
   const debounceMs = options.debounceMs ?? 300
 
-  let lcuDir = options.lcuDirOverride
+  // 手动目录每次连接尝试重新解析（getter 支持设置页改动免重启）；测试 setLcuDirForTest 注入的值优先
+  let testOverrideDir: string | undefined = undefined
+  function resolveOverrideDir(): string | undefined {
+    const override = testOverrideDir
+      ?? (typeof options.lcuDirOverride === 'function' ? options.lcuDirOverride() : options.lcuDirOverride)
+    const resolved = override?.trim() ? normalizeLcuDir(override) : undefined
+    return resolved || undefined
+  }
+  let lcuDir: string | undefined = undefined // 最近一次解析出的手动目录；tick 存活检查沿用（connected 期间不因设置改动抖断）
+  // 当前指定目录（诊断展示：正在探测哪个目录；自动发现时保持 null）
+  let targetDir: string | null = null
   // 命中目录记忆（tryConnect 成功时记录，含进程扫描回退）：lcuDir 未设置时供 tick 存活检查兜底。
   // 否则 tick 会以 undefined 重扫候选（miss）→ 进程扫描（30s 限流内直接 miss）→ 误判客户端已退出，闪连；不随 disconnect 清空。
   let discoveredDir: string | null = null
@@ -131,6 +142,8 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
   }
 
   async function tryConnect(): Promise<boolean> {
+    lcuDir = resolveOverrideDir() // 定期重解析：设置页保存后数秒内自动生效
+    targetDir = lcuDir ?? null
     const lock = discoverLockfile({ envDir: lcuDir })
     if (!lock) return false
 
@@ -190,10 +203,10 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
       return () => statusHandlers.delete(handler)
     },
     setLcuDirForTest(dir: string) {
-      lcuDir = dir
+      testOverrideDir = dir
     },
     http: () => http,
     readers: () => readers,
-    info: () => ({ status, lockDir: info?.lockDir ?? null, port: info?.port ?? null, lastError }),
+    info: () => ({ status, lockDir: info?.lockDir ?? null, port: info?.port ?? null, lastError, targetDir }),
   }
 }

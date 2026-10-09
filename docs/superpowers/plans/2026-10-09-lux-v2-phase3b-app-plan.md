@@ -1616,26 +1616,36 @@ export interface WindowManager {
   create(): BrowserWindow
   setView(state: string): void
   setAdviceActive(active: boolean): void
+  /** 托盘「显示小窗」：置顶显示并抑制自动隐藏，直到用户隐藏/离开 */
+  setPinned(pinned: boolean): void
   win(): BrowserWindow | null
 }
 
 export function createWindowManager(config: ConfigStore): WindowManager {
   let win: BrowserWindow | null = null
   let adviceActive = false
-  let settingsOpen = false
+  let pinned = false
+  const ALWAYS_VISIBLE_VIEWS = new Set(['settings', 'onboarding'])
+  let currentView = 'main'
 
   function updateVisibility(): void {
     if (!win) return
-    if (adviceActive || settingsOpen) win.showInactive()
+    if (pinned || adviceActive || ALWAYS_VISIBLE_VIEWS.has(currentView)) win.showInactive()
     else win.hide()
+  }
+
+  function currentWorkArea(): Electron.Rectangle | null {
+    if (!win) return null
+    return screen.getDisplayMatching(win.getBounds()).workArea // 多显示器：按窗口所在屏幕约束
   }
 
   return {
     create() {
       const saved = config.get().windowPos
-      const area = screen.getPrimaryDisplay().workArea
       const size = { width: SIZES.main[0], height: SIZES.main[1] }
-      const pos = clampToWorkArea(saved ?? { x: area.x + area.width - size.width - 24, y: area.y + 120 }, size, area)
+      const anchor = saved ?? { x: 24, y: 120 }
+      const workArea = screen.getDisplayMatching({ x: anchor.x, y: anchor.y, width: 1, height: 1 }).workArea
+      const pos = clampToWorkArea(anchor, size, workArea)
 
       win = new BrowserWindow({
         ...pos,
@@ -1645,19 +1655,27 @@ export function createWindowManager(config: ConfigStore): WindowManager {
         resizable: false,
         skipTaskbar: true,
         show: false,
+        transparent: true,
+        backgroundColor: '#00000000',
         webPreferences: {
           preload: join(__dirname, '../preload/index.mjs'),
           contextIsolation: true,
           sandbox: false,
         },
       })
-      win.loadFile(join(__dirname, '../renderer/index.html'))
+      // dev 模式走 vite dev server；构建产物回退文件
+      if (process.env.ELECTRON_RENDERER_URL) {
+        void win.loadURL(process.env.ELECTRON_RENDERER_URL)
+      } else {
+        win.loadFile(join(__dirname, '../renderer/index.html'))
+      }
 
       const savePos = (): void => {
         if (!win) return
         const [x, y] = win.getPosition()
         const [w, h] = win.getSize()
-        const snapped = snapToEdge({ x, y }, { width: w, height: h }, screen.getPrimaryDisplay().workArea)
+        const area = screen.getDisplayMatching(win.getBounds()).workArea
+        const snapped = snapToEdge({ x, y }, { width: w, height: h }, area)
         if (snapped.x !== x || snapped.y !== y) win.setPosition(snapped.x, snapped.y)
         config.set({ windowPos: snapped })
       }
@@ -1666,24 +1684,29 @@ export function createWindowManager(config: ConfigStore): WindowManager {
     },
     setView(state) {
       if (!win) return
+      currentView = state
       const size = SIZES[state] ?? SIZES.main
       win.setSize(size[0], size[1])
-      const [x, y] = win.getPosition()
-      const area = screen.getPrimaryDisplay().workArea
-      win.setPosition(...Object.values(clampToWorkArea({ x, y }, { width: size[0], height: size[1] }, area)) as [number, number])
-      settingsOpen = state === 'settings' || state === 'onboarding'
+      const area = currentWorkArea()
+      if (area) {
+        const [x, y] = win.getPosition()
+        const clamped = clampToWorkArea({ x, y }, { width: size[0], height: size[1] }, area)
+        if (clamped.x !== x || clamped.y !== y) win.setPosition(clamped.x, clamped.y)
+      }
       updateVisibility()
     },
     setAdviceActive(active) {
       adviceActive = active
       updateVisibility()
     },
+    setPinned(next) {
+      pinned = next
+      updateVisibility()
+    },
     win: () => win,
   }
 }
 ```
-
-（`win.hide()/showInactive` 在设置页打开时保持可见：settingsOpen 逻辑已覆盖；「离开选人自动隐藏」由 adviceActive 驱动——但设置页打开时用户正在操作，不展示建议面板，故 index.ts 中把 setView('settings'|'onboarding') 也视为可见。执行时确保：状态 waiting/connected → setAdviceActive(false)；in-champ-select → true，**除**了用户当前在 settings/onboarding 视图时（此时窗口保持可见，renderer 自会切视图）——由 renderer 发 `set-window-state` 时附带，index 中记录 currentView，updateVisibility = adviceActive || currentView ∈ {settings, onboarding}。）
 
 - [ ] **Step 5: index.ts 接入 WindowManager + 状态联动**
 
@@ -1752,6 +1775,7 @@ const GOLD_PX = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfF
 
 export interface TrayDeps {
   show(): void
+  hide(): void
   openSettings(): void
 }
 
@@ -1761,6 +1785,7 @@ export function createAppTray(deps: TrayDeps): Tray {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: '显示小窗', click: () => deps.show() },
+      { label: '隐藏小窗', click: () => deps.hide() },
       { label: '设置', click: () => deps.openSettings() },
       { type: 'separator' },
       { label: '退出 Lux', click: () => app.quit() },
@@ -1779,8 +1804,17 @@ import { createAppTray } from './tray'
 let tray: Tray | null = null
 if (!UI_MOCK) {
   tray = createAppTray({
-    show: () => windows.win()?.showInactive(),
+    show: () => {
+      windows.setPinned(true) // 抑制自动隐藏，直到用户主动隐藏/离开
+      windows.win()?.showInactive()
+    },
+    hide: () => {
+      windows.setPinned(false)
+      windows.win()?.hide()
+    },
     openSettings: () => {
+      windows.setPinned(true)
+      windows.setView('settings')
       windows.win()?.showInactive()
       windows.win()?.webContents.send('lux:open-view', 'settings')
     },
@@ -1788,7 +1822,24 @@ if (!UI_MOCK) {
 }
 ```
 
-（preload 增加 `onOpenView(cb)` 监听 `lux:open-view`；renderer App 接收后切设置视图。执行时：preload 加频道，App 在 Task 9 统一消费。**本步先加 preload 频道 + App 监听占位**。）
+（preload 增加 `onOpenView(cb)` 监听 `lux:open-view`；renderer App 接收后切设置视图。）
+
+**并在 index.ts 顶部加单实例锁**（隐藏式窗口下用户重复双击会静默启动第二实例 → 双份 LCU 轮询 + 配置互相覆盖）：
+
+```ts
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    windows?.setPinned(true)
+    windows?.win()?.showInactive()
+  })
+  // …现有的 whenReady 流程整体放入此分支
+}
+```
+
+（`windows` 需为模块级变量以便 second-instance 访问；执行时把现有模块级 `windows` 声明提前。）
 
 - [ ] **Step 4: 验证与提交**
 

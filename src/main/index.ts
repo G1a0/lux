@@ -1,9 +1,14 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
+import { createApp } from './app'
 import { captureAllViews } from './screenshot'
+
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = '1'
 
 const UI_MOCK = process.env.LUX_UI_MOCK === '1'
 const screenshotArgIdx = process.argv.indexOf('--screenshot')
+
+let bundle: ReturnType<typeof createApp> | null = null
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -30,8 +35,42 @@ function createWindow(): BrowserWindow {
   return win
 }
 
+function wireIpc(win: BrowserWindow): void {
+  if (!bundle) return
+  const { service } = bundle
+  service.onSnapshot(s => win.webContents.send('lux:snapshot', s))
+  service.onStatus(s => win.webContents.send('lux:status', s))
+  service.onSyncProgress((d, t) => win.webContents.send('lux:sync-progress', d, t))
+
+  ipcMain.handle('lux:apply-runes', () => service.applyRunes())
+  ipcMain.handle('lux:apply-spells', () => service.applySpells())
+  ipcMain.handle('lux:get-config', () => service.getConfig())
+  ipcMain.handle('lux:set-config', (_e, patch) => service.setConfig(patch))
+  ipcMain.handle('lux:get-manifest', () => service.getManifest())
+  ipcMain.handle('lux:sync-now', () => service.syncNow())
+  ipcMain.handle('lux:quit', () => app.quit())
+  // Task 7 引入 WindowManager 后替换：按视图状态调整窗口尺寸的临时实现
+  ipcMain.on('lux:set-window-state', (_e, state: string) => {
+    const sizes: Record<string, [number, number]> = {
+      main: [380, 240],
+      expanded: [380, 460],
+      aram: [380, 280],
+      pill: [220, 48],
+      settings: [420, 520],
+      onboarding: [420, 560],
+    }
+    const size = sizes[state]
+    if (size) win.setSize(size[0], size[1])
+  })
+}
+
 app.whenReady().then(async () => {
   const win = createWindow()
+  if (!UI_MOCK) {
+    bundle = createApp()
+    bundle.service.start()
+    wireIpc(win)
+  }
   if (screenshotArgIdx >= 0) {
     const dir = process.argv[screenshotArgIdx + 1] ?? 'screenshots'
     await new Promise<void>(resolve => win.webContents.once('did-finish-load', () => resolve()))
@@ -44,3 +83,4 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
+app.on('before-quit', () => bundle?.service.stop())

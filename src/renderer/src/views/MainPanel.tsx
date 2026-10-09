@@ -1,19 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getBridge, type LcuInfo, type UiSnapshot } from '../bridge'
+import { keystoneName, spellName } from '../names'
+import { ChampIcon } from './ChampIcon'
 
-const SPELL_NAMES: Record<number, string> = {
-  1: '净化', 3: '虚弱', 4: '闪现', 6: '疾跑', 7: '治疗', 11: '惩戒', 12: '传送', 14: '点燃', 21: '护盾', 32: '标记',
-}
 /** queueId → 模式中文名；未知队列回退 '对局' */
 const MODE_LABELS: Record<number, string> = {
   400: '征召', 420: '排位', 430: '匹配', 440: '排位', 450: '大乱斗',
-}
-const KEYSTONES: Record<number, string> = {
-  8005: '强攻', 8008: '致命节奏', 8010: '征服者', 8021: '迅捷步法',
-  8112: '电刑', 8124: '掠食者', 8128: '黑暗收割', 9923: '丛刃',
-  8214: '召唤艾黎', 8229: '奥术彗星', 8230: '相位猛冲',
-  8437: '余震', 8439: '守护者', 8465: '不灭之握',
-  8351: '冰川增幅', 8360: '启封的秘籍', 8369: '先攻', 8992: '冥火之触',
 }
 
 export interface MainPanelProps {
@@ -154,13 +146,16 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
         </span>
       </div>
       <div className="primary-row">
-        <span className="champ-name">{nameOf(primary.championId, snapshot)}</span>
+        <span className="champ-name">
+          <ChampIcon id={primary.championId} size={40} />
+          {nameOf(primary.championId, snapshot)}
+        </span>
         <span className="score">{primary.score}</span>
       </div>
       <div className="reason">{primary.reason}{primary.partialData ? '（部分数据缺失）' : ''}</div>
       <div className="loadout">
-        <div>符文：{runes ? `${KEYSTONES[runes.keystoneId] ?? `基石${runes.keystoneId}`}` : '暂无'}</div>
-        <div>技能：{spells ? spells.spellIds.map(id => SPELL_NAMES[id] ?? id).join(' + ') : '暂无'}</div>
+        <div>符文：{runes ? keystoneName(runes.keystoneId) : '暂无'}</div>
+        <div>技能：{spells ? spells.spellIds.map(id => spellName(id)).join(' + ') : '暂无'}</div>
       </div>
       <div className="actions no-drag">
         <button onClick={() => void onApplyRunes()} disabled={!runes}>一键应用符文</button>

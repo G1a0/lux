@@ -7,6 +7,7 @@ describe('bridge', () => {
     delete (window as { lux?: unknown }).lux
     const b = getBridge()
     expect(await b.applySpells()).toBe(false)
+    expect(await b.getChampionIcon(22)).toBeNull()
     expect(await b.getManifest()).toBeNull()
     expect(() => b.setWindowState('main')).not.toThrow()
   })

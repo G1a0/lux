@@ -10,8 +10,10 @@ import { WebSocketServer, type WebSocket } from 'ws'
 export interface MockRouteResult {
   status?: number
   json?: unknown
+  /** 二进制响应体（英雄头像等资源接口）；与 json 互斥，优先于 json */
+  raw?: Buffer
   /** 动态处理：拿到请求体返回结果 */
-  handler?: (body: unknown, req: IncomingMessage) => { status?: number; json?: unknown }
+  handler?: (body: unknown, req: IncomingMessage) => { status?: number; json?: unknown; raw?: Buffer }
 }
 
 export interface MockLcuOptions {
@@ -77,10 +79,15 @@ export async function createMockLcu(options: MockLcuOptions): Promise<MockLcu> {
       res.writeHead(404).end()
       return
     }
-    const result = route.handler ? route.handler(body, req) : { status: route.status, json: route.json }
+    const result = route.handler ? route.handler(body, req) : { status: route.status, json: route.json, raw: route.raw }
     const status = result.status ?? 200
-    if (status === 204 || result.json === undefined) {
+    if (status === 204 || (result.json === undefined && result.raw === undefined)) {
       res.writeHead(status).end()
+      return
+    }
+    if (result.raw !== undefined) {
+      res.writeHead(status, { 'Content-Type': 'application/octet-stream' })
+      res.end(result.raw)
       return
     }
     res.writeHead(status, { 'Content-Type': 'application/json' })

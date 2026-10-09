@@ -1,4 +1,5 @@
 import type { UiSnapshot } from '../bridge'
+import { ChampIcon } from './ChampIcon'
 
 export interface ExpandedPanelProps {
   snapshot: UiSnapshot
@@ -17,14 +18,20 @@ export function ExpandedPanel({ snapshot, onBack }: ExpandedPanelProps): React.J
         {snapshot.advice.alternates.map(alt => (
           <li key={alt.championId}>
             <div className="alt-head">
-              <span className="champ-name">{snapshot.names?.[alt.championId] ?? `英雄${alt.championId}`}</span>
+              <span className="champ-name">
+                <ChampIcon id={alt.championId} size={20} />
+                {snapshot.names?.[alt.championId] ?? `英雄${alt.championId}`}
+              </span>
               <span className="score">{alt.score}</span>
             </div>
             <div className="reason">{alt.reason}{alt.partialData ? '（部分数据缺失）' : ''}</div>
           </li>
         ))}
       </ul>
-      <div className="dim">主推：{snapshot.names?.[snapshot.advice.primary.championId] ?? ''}（{snapshot.advice.primary.score}）· {snapshot.advice.primary.reason}</div>
+      <div className="dim">
+        <ChampIcon id={snapshot.advice.primary.championId} size={28} />
+        主推：{snapshot.names?.[snapshot.advice.primary.championId] ?? ''}（{snapshot.advice.primary.score}）· {snapshot.advice.primary.reason}
+      </div>
     </div>
   )
 }

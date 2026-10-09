@@ -3,7 +3,7 @@
 import type { ChampSelectSession } from '../../shared/lcu/types'
 import { mapAramInput, mapRiftContext, proficiencyFromMastery } from '../../shared/lcu/map-session'
 import { applyRunePage, carrySpells } from '../../shared/lcu/writers'
-import type { LcuHttp } from '../../shared/lcu/http'
+import { LcuHttpError, type LcuHttp } from '../../shared/lcu/http'
 import type { LcuReaders } from '../../shared/lcu/readers'
 import type { AramJudgeResult, RiftAdvice } from '../../shared/engine/types'
 import type { AppConfig, ConfigStore } from './config'
@@ -60,6 +60,8 @@ export interface CompanionService {
   onSyncProgress(handler: (done: number, total: number) => void): () => void
   applyRunes(): Promise<{ ok: boolean; reason?: string }>
   applySpells(): Promise<boolean>
+  /** 英雄头像（LCU 本地资源 → data URL）；不可用时 null（界面降级为纯文本） */
+  getChampionIcon(championId: number): Promise<string | null>
   getConfig(): AppConfig
   setConfig(patch: Partial<AppConfig>): AppConfig
   getManifest(): ManifestInfo | null
@@ -75,6 +77,8 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
   let lastKey = ''
   let lastSession: ChampSelectSession | null = null
   const caches: RosterCaches = { owned: [], proficiency: {} }
+  /** 头像缓存：成功存 data URL，LCU 404 存 null（图标不存在，重试无意义）；其他错误不缓存 */
+  const iconCache = new Map<number, string | null>()
   let rosterTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setInterval> | null = null
   let syncInFlight: Promise<SyncOutcome> | null = null
@@ -237,6 +241,22 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
             : null
       if (!spells) return false
       return carrySpells(http, spells.spellIds)
+    },
+    async getChampionIcon(championId) {
+      const http = deps.source.http()
+      if (!http) return null
+      if (iconCache.has(championId)) return iconCache.get(championId) ?? null
+      try {
+        const buf = await http.getBuffer(`/lol-game-data/assets/v1/champion-icons/${championId}.png`)
+        if (!buf) return null // 2xx 空体：异常响应，不缓存
+        const url = `data:image/png;base64,${buf.toString('base64')}`
+        iconCache.set(championId, url)
+        return url
+      } catch (error) {
+        // 404 = 该英雄无图标，缓存 null 避免反复请求；其余错误（超时/断连）留给下次重试
+        if (error instanceof LcuHttpError && error.status === 404) iconCache.set(championId, null)
+        return null
+      }
     },
     getConfig: () => deps.config.get(),
     setConfig(patch) {

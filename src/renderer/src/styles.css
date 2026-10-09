@@ -30,6 +30,10 @@ body {
 .panel-actions button { background: none; border: 1px solid var(--border-gold); color: var(--gold); border-radius: 4px; margin-left: 4px; padding: 0 6px; cursor: pointer; }
 .primary-row { display: flex; justify-content: space-between; align-items: baseline; }
 .champ-name { color: var(--gold-bright); font-size: 18px; font-weight: 700; }
+.champ-icon { border-radius: 4px; vertical-align: middle; flex: 0 0 auto; }
+.champ-name .champ-icon { margin-right: 6px; }
+.champ-icon-active { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
+.bench-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .score { color: var(--gold); font-size: 14px; }
 .reason { color: var(--text); font-size: 13px; }
 .dim { color: var(--text-dim); font-size: 12px; }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, fireEvent } from '@testing-library/react'
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MainPanel } from './MainPanel'
 import type { UiSnapshot } from '../bridge'
 
@@ -153,6 +153,15 @@ describe('MainPanel', () => {
   it('状态行：未知 status 原样显示', async () => {
     renderWithLcuInfo(waitingInfo({ status: 'connecting' }))
     expect(await screen.findByText('状态：connecting · 端口：未知')).toBeTruthy()
+  })
+
+  it('主推头像：桥返回 data URL 时渲染于主推行', async () => {
+    ;(window as unknown as { lux: unknown }).lux = { getChampionIcon: async () => 'data:image/png;base64,AAAA' }
+    const { container } = render(<MainPanel snapshot={snap} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+    await waitFor(() => {
+      expect(container.querySelector('.primary-row img.champ-icon')).toBeTruthy()
+    })
+    expect(container.querySelector('.primary-row img')?.getAttribute('src')).toBe('data:image/png;base64,AAAA')
   })
 
   it('一键应用按钮调用桥', async () => {

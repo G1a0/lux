@@ -17,6 +17,7 @@ export interface UiBridge {
   onOpenView(cb: (view: string) => void): () => void
   applyRunes(): Promise<{ ok: boolean; reason?: string }>
   applySpells(): Promise<boolean>
+  getChampionIcon(championId: number): Promise<string | null>
   getConfig(): Promise<Record<string, unknown>>
   setConfig(patch: Record<string, unknown>): Promise<Record<string, unknown>>
   setWindowState(state: string): void
@@ -49,6 +50,7 @@ export function createInertBridge(): UiBridge {
     onOpenView: () => () => {},
     applyRunes: async () => ({ ok: false, reason: '未连接应用主进程' }),
     applySpells: async () => false,
+    getChampionIcon: async () => null,
     getConfig: async () => ({}),
     setConfig: async p => p,
     setWindowState: () => {},

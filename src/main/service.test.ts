@@ -4,6 +4,7 @@ import type { AppConfig, ConfigStore } from './config'
 import { DEFAULT_CONFIG } from './config'
 import type { AramJudgeResult, RiftAdvice } from '../../shared/engine/types'
 import type { ChampSelectSession } from '../../shared/lcu/types'
+import { LcuHttpError, type LcuHttp } from '../../shared/lcu/http'
 
 function fakeConfig(initial: Partial<AppConfig> = {}): ConfigStore {
   let current: AppConfig = { ...DEFAULT_CONFIG, ...initial }
@@ -16,7 +17,7 @@ function fakeConfig(initial: Partial<AppConfig> = {}): ConfigStore {
   }
 }
 
-function fakeSource(): AdviceSource & {
+function fakeSource(activeHttp: LcuHttp | null = null): AdviceSource & {
   emit(session: unknown): void
   emitStatus(status: string): void
   stopSpy: ReturnType<typeof vi.fn>
@@ -35,11 +36,24 @@ function fakeSource(): AdviceSource & {
       statusHandlers.add(h)
       return () => statusHandlers.delete(h)
     },
-    http: () => null,
+    http: () => activeHttp,
     readers: () => null,
     emit: session => adviceHandlers.forEach(h => h({ session: session as ChampSelectSession })),
     emitStatus: status => statusHandlers.forEach(h => h(status)),
     stopSpy,
+  }
+}
+
+/** 最小 LcuHttp 桩：仅覆盖被测方法（getChampionIcon 只用到 getBuffer） */
+function fakeHttp(overrides: Partial<LcuHttp>): LcuHttp {
+  return {
+    get: async () => null,
+    getBuffer: async () => null,
+    post: async () => null,
+    put: async () => null,
+    patch: async () => null,
+    del: async () => null,
+    ...overrides,
   }
 }
 
@@ -83,10 +97,11 @@ function makeService(
     computeRift?: unknown
     computeAram?: unknown
     championName?: (id: number) => string | null
+    http?: LcuHttp | null
   } = {},
 ) {
   const events: unknown[] = []
-  const source = fakeSource()
+  const source = fakeSource(overrides.http ?? null)
   const service = createCompanionService({
     source,
     config: fakeConfig(),
@@ -367,5 +382,43 @@ describe('CompanionService', () => {
     expect((events[events.length - 1] as { kind: string }).kind).toBe('rift')
     service.stop()
     expect(source.stopSpy).toHaveBeenCalled()
+  })
+})
+
+describe('getChampionIcon', () => {
+  it('正常：读取 PNG → data URL；缓存命中不再请求', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x01, 0x02])
+    const getBuffer = vi.fn(async () => png)
+    const { service } = makeService({ http: fakeHttp({ getBuffer }) })
+    const url = await service.getChampionIcon(22)
+    expect(url).toBe(`data:image/png;base64,${png.toString('base64')}`)
+    expect(getBuffer).toHaveBeenCalledWith('/lol-game-data/assets/v1/champion-icons/22.png')
+    expect(await service.getChampionIcon(22)).toBe(url)
+    expect(getBuffer).toHaveBeenCalledTimes(1)
+  })
+
+  it('未连接客户端 → null（不请求）', async () => {
+    const { service } = makeService()
+    expect(await service.getChampionIcon(22)).toBeNull()
+  })
+
+  it('404 → null 并缓存（二次调用不再打 http）', async () => {
+    const getBuffer = vi.fn(async () => {
+      throw new LcuHttpError(404, '/lol-game-data/assets/v1/champion-icons/9999.png')
+    })
+    const { service } = makeService({ http: fakeHttp({ getBuffer }) })
+    expect(await service.getChampionIcon(9999)).toBeNull()
+    expect(await service.getChampionIcon(9999)).toBeNull()
+    expect(getBuffer).toHaveBeenCalledTimes(1)
+  })
+
+  it('其他错误 → null 且不缓存（下次重试）', async () => {
+    const getBuffer = vi.fn(async () => {
+      throw new Error('timeout')
+    })
+    const { service } = makeService({ http: fakeHttp({ getBuffer }) })
+    expect(await service.getChampionIcon(57)).toBeNull()
+    expect(await service.getChampionIcon(57)).toBeNull()
+    expect(getBuffer).toHaveBeenCalledTimes(2)
   })
 })

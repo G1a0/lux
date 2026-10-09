@@ -58,6 +58,7 @@ function wireIpc(win: BrowserWindow, manager: WindowManager): void {
 
   ipcMain.handle('lux:apply-runes', () => service.applyRunes())
   ipcMain.handle('lux:apply-spells', () => service.applySpells())
+  ipcMain.handle('lux:get-champion-icon', (_e, id: number) => service.getChampionIcon(id))
   ipcMain.handle('lux:get-config', () => service.getConfig())
   ipcMain.handle('lux:set-config', (_e, patch) => service.setConfig(patch))
   ipcMain.handle('lux:get-manifest', () => service.getManifest())

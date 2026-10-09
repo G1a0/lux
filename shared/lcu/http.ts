@@ -20,6 +20,8 @@ export interface LcuHttpOptions {
 
 export interface LcuHttp {
   get<T>(path: string): Promise<T | null>
+  /** 原始字节读取（英雄头像等二进制资源）：2xx 返回 body Buffer，非 2xx 抛 LcuHttpError */
+  getBuffer(path: string): Promise<Buffer | null>
   post<T>(path: string, body?: unknown): Promise<T | null>
   put<T>(path: string, body?: unknown): Promise<T | null>
   patch<T>(path: string, body?: unknown): Promise<T | null>
@@ -30,7 +32,7 @@ export function createLcuHttp(options: LcuHttpOptions): LcuHttp {
   const timeoutMs = options.timeoutMs ?? 3000
   const auth = `Basic ${Buffer.from(`riot:${options.password}`).toString('base64')}`
 
-  function send<T>(method: string, path: string, body?: unknown): Promise<T | null> {
+  function send<T>(method: string, path: string, body?: unknown, raw = false): Promise<T | null> {
     return new Promise<T | null>((resolve, reject) => {
       const payload = body === undefined ? undefined : JSON.stringify(body)
       const req = request(
@@ -60,6 +62,10 @@ export function createLcuHttp(options: LcuHttpOptions): LcuHttp {
               reject(new LcuHttpError(status, path))
               return
             }
+            if (raw) {
+              resolve(Buffer.concat(chunks) as unknown as T)
+              return
+            }
             try {
               resolve(JSON.parse(Buffer.concat(chunks).toString('utf-8')) as T)
             } catch {
@@ -77,6 +83,7 @@ export function createLcuHttp(options: LcuHttpOptions): LcuHttp {
 
   return {
     get: (path) => send('GET', path),
+    getBuffer: (path) => send<Buffer>('GET', path, undefined, true),
     post: (path, body) => send('POST', path, body),
     put: (path, body) => send('PUT', path, body),
     patch: (path, body) => send('PATCH', path, body),

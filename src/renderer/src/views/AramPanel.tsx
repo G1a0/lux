@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getBridge, type UiSnapshot } from '../bridge'
-
-const SPELL_NAMES: Record<number, string> = { 1: '净化', 3: '虚弱', 4: '闪现', 6: '疾跑', 7: '治疗', 11: '惩戒', 12: '传送', 14: '点燃', 21: '护盾', 32: '标记' }
+import { keystoneName, spellName } from '../names'
+import { ChampIcon } from './ChampIcon'
 
 export interface AramPanelProps {
   snapshot: UiSnapshot
@@ -25,6 +25,8 @@ export function AramPanel({ snapshot }: AramPanelProps): React.JSX.Element {
       : aram.action === 'reroll'
         ? '掷骰子'
         : '留着'
+  // 建议头像：要换则展示换入目标，否则展示当前英雄
+  const suggested = aram.action === 'swap' && aram.swapTo ? aram.swapTo.championId : aram.current.championId
 
   async function onApplyRunes(): Promise<void> {
     const r = await bridge.applyRunes()
@@ -38,12 +40,30 @@ export function AramPanel({ snapshot }: AramPanelProps): React.JSX.Element {
   return (
     <div className="panel drag-region">
       <div className="panel-title no-drag"><span>大乱斗 · 当前：{name(aram.current.championId)}（{aram.current.score}）</span></div>
-      <div className="primary-row"><span className="champ-name">建议：{headline}</span></div>
+      <div className="primary-row">
+        <span className="champ-name">
+          <ChampIcon id={suggested} size={40} />
+          建议：{headline}
+        </span>
+      </div>
       <div className="reason">{aram.reason}</div>
       <div className="loadout">
-        <div>符文：{aram.runes ? `基石${aram.runes.keystoneId}` : '暂无'}</div>
-        <div>技能：{aram.spells ? aram.spells.spellIds.map(id => SPELL_NAMES[id] ?? id).join(' + ') : '暂无'}</div>
+        <div>符文：{aram.runes ? keystoneName(aram.runes.keystoneId) : '暂无'}</div>
+        <div>技能：{aram.spells ? aram.spells.spellIds.map(id => spellName(id)).join(' + ') : '暂无'}</div>
       </div>
+      {aram.bench.length > 0 && (
+        <div className="bench-row">
+          {aram.bench.map(b => (
+            <span key={b.championId} title={name(b.championId)}>
+              <ChampIcon
+                id={b.championId}
+                size={24}
+                active={aram.action === 'swap' && aram.swapTo?.championId === b.championId}
+              />
+            </span>
+          ))}
+        </div>
+      )}
       <div className="actions no-drag">
         <button onClick={() => void onApplyRunes()} disabled={!aram.runes}>一键应用符文</button>
         <button onClick={() => void onApplySpells()} disabled={!aram.spells}>携带技能</button>

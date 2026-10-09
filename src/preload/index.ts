@@ -33,6 +33,7 @@ const bridge = {
   },
   applyRunes: () => ipcRenderer.invoke('lux:apply-runes'),
   applySpells: () => ipcRenderer.invoke('lux:apply-spells'),
+  getChampionIcon: (id: number) => ipcRenderer.invoke('lux:get-champion-icon', id),
   getConfig: () => ipcRenderer.invoke('lux:get-config'),
   setConfig: (patch: unknown) => ipcRenderer.invoke('lux:set-config', patch),
   setWindowState: (state: string) => ipcRenderer.send('lux:set-window-state', state),

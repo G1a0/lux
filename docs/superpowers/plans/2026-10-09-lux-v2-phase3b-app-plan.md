@@ -948,6 +948,36 @@ describe('CompanionService', () => {
     service.setConfig({ modes: { rift: false, aram: true } })
     expect(seen.map(s => s.kind)).toEqual(['rift', 'none'])
   })
+
+  it('syncNow 并发调用单飞（不重复发起）', async () => {
+    let calls = 0
+    const service = createCompanionService({
+      source: fakeSource(),
+      config: fakeConfig(),
+      computeRift: () => ({ kind: 'none' }) as never,
+      computeAram: () => ({ kind: 'none' }) as never,
+      syncRunner: async () => {
+        calls += 1
+        await new Promise(r => setTimeout(r, 20))
+        return { status: 'synced' }
+      },
+      dataRoot: '/tmp/lux-data',
+    })
+    const [a, b] = await Promise.all([service.syncNow(), service.syncNow()])
+    expect(calls).toBe(1)
+    expect(a.status).toBe('synced')
+    expect(b.status).toBe('synced')
+  })
+
+  it('位置变化（英雄不变）触发重算', () => {
+    const { service } = makeService()
+    const seen: unknown[] = []
+    service.onSnapshot(s => seen.push(s))
+    service.handleSession(SESSION_RIFT)
+    const moved = { ...SESSION_RIFT, myTeam: SESSION_RIFT.myTeam.map(p => ({ ...p, assignedPosition: 'top' })) } as never
+    service.handleSession(moved)
+    expect(seen).toHaveLength(2)
+  })
 })
 ```
 

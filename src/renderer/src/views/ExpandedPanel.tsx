@@ -12,8 +12,10 @@ export function ExpandedPanel({ snapshot }: ExpandedPanelProps): React.JSX.Eleme
       <ul className="alt-list">
         {snapshot.advice.alternates.map(alt => (
           <li key={alt.championId}>
-            <span className="champ-name">{snapshot.names?.[alt.championId] ?? `英雄${alt.championId}`}</span>
-            <span className="score">{alt.score}</span>
+            <div className="alt-head">
+              <span className="champ-name">{snapshot.names?.[alt.championId] ?? `英雄${alt.championId}`}</span>
+              <span className="score">{alt.score}</span>
+            </div>
             <div className="reason">{alt.reason}{alt.partialData ? '（部分数据缺失）' : ''}</div>
           </li>
         ))}

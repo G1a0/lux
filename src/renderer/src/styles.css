@@ -26,3 +26,14 @@ body {
   background: linear-gradient(160deg, var(--bg-panel), var(--bg-deep));
   border: 1px solid var(--border-gold); border-radius: 8px; padding: 12px;
 }
+.panel-title { display: flex; justify-content: space-between; align-items: center; color: var(--gold-bright); font-weight: 600; }
+.panel-actions button { background: none; border: 1px solid var(--border-gold); color: var(--gold); border-radius: 4px; margin-left: 4px; padding: 0 6px; cursor: pointer; }
+.primary-row { display: flex; justify-content: space-between; align-items: baseline; }
+.champ-name { color: var(--gold-bright); font-size: 18px; font-weight: 700; }
+.score { color: var(--gold); font-size: 14px; }
+.reason { color: var(--text); font-size: 13px; }
+.dim { color: var(--text-dim); font-size: 12px; }
+.loadout { color: var(--text-dim); font-size: 12px; }
+.actions { display: flex; gap: 8px; margin-top: auto; }
+.actions button { flex: 1; background: linear-gradient(180deg, #1e3a5f, #16283f); color: var(--gold-bright); border: 1px solid var(--border-gold); border-radius: 4px; padding: 6px 0; cursor: pointer; }
+.actions button:disabled { opacity: 0.4; cursor: default; }

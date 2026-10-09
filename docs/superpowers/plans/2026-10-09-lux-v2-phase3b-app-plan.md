@@ -1240,7 +1240,7 @@ import { createLcuAdvisor } from '../../shared/lcu/advisor'
 import { buildChampionIndex } from '../../shared/lcu/resources'
 import { createWarehouse } from '../../shared/warehouse/store'
 import { createEngineData, type EngineData } from '../../shared/engine/data'
-import { createChampionIndex } from '../../shared/champions/meta'
+import { createChampionIndex, type ChampionIndex } from '../../shared/champions/meta'
 import { mapAramInput, mapRiftContext } from '../../shared/lcu/map-session'
 import { recommendRift } from '../../shared/engine/recommend'
 import { judgeAram } from '../../shared/engine/aram'
@@ -1268,9 +1268,14 @@ export function createAppWithPaths(
   const config = createConfigStore(paths.configDir)
   const warehouse = createWarehouse(paths.dataRoot)
 
-  // datasetRef：引擎数据随"客户端连上后构建的资源索引"替换；compute 闭包经 ref 读取最新值
+  // datasetRef：引擎数据随「资源索引就绪」与「每次同步成功」重建；compute 闭包经 ref 读取最新值。
+  // 关键修复：首启时索引可能先于首次同步完成——同步成功后必须重建（否则 patch=null 时推荐为空直到重启）。
   const datasetRef: { current: EngineData } = {
     current: createEngineData(warehouse, createChampionIndex([])),
+  }
+  const builtIndexRef: { current: ChampionIndex | null } = { current: null }
+  const rebuildDataset = (): void => {
+    datasetRef.current = createEngineData(warehouse, builtIndexRef.current ?? createChampionIndex([]))
   }
 
   let source: AdviceSource
@@ -1286,16 +1291,17 @@ export function createAppWithPaths(
       http: () => advisor.http(),
       readers: () => advisor.readers(),
     }
-    // 客户端连上后构建英雄资源索引（每 2s 检查一次，成功即停）
+    // 客户端连上后构建英雄资源索引（每 2s 重试；仅成功后停止重试）
     const timer = setInterval(() => {
       const http = advisor.http()
       if (!http) return
-      clearInterval(timer)
       void buildChampionIndex(http)
         .then(index => {
-          datasetRef.current = createEngineData(warehouse, index)
+          builtIndexRef.current = index
+          rebuildDataset()
+          clearInterval(timer)
         })
-        .catch(error => console.warn('[app] 英雄资源构建失败：', error))
+        .catch(error => console.warn('[app] 英雄资源构建失败（将重试）：', error))
     }, 2000)
   }
 
@@ -1319,6 +1325,7 @@ export function createAppWithPaths(
       }
       const client = createQq101Client()
       const result = await syncRiftData({ client, warehouse, onProgress })
+      if (result.patch) rebuildDataset() // 同步成功 → 数据仓就绪/更新：重建引擎数据（修复首启竞态）
       return { status: result.status, patch: result.patch }
     },
     dataRoot: paths.dataRoot,
@@ -1438,8 +1445,8 @@ app.whenReady().then(async () => {
   const win = createWindow()
   if (!UI_MOCK) {
     bundle = createApp()
+    wireIpc(win) // 先接 IPC，再启动服务：避免启动早期事件因监听未就位而丢失
     bundle.service.start()
-    wireIpc(win)
   }
   if (screenshotArgIdx >= 0) {
     const dir = process.argv[screenshotArgIdx + 1] ?? 'screenshots'

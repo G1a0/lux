@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { clampToWorkArea, snapToEdge } from './window-logic'
 import type { ConfigStore } from './config'
 
-const SIZES: Record<string, [number, number]> = {
+export const SIZES: Record<string, [number, number]> = {
   main: [380, 240],
   expanded: [380, 460],
   aram: [380, 280],

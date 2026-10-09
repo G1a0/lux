@@ -2,6 +2,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { BrowserWindow } from 'electron'
+import { SIZES } from './window'
 
 export const MOCK_VIEWS = ['main', 'expanded', 'aram', 'pill', 'settings', 'onboarding'] as const
 export type MockView = (typeof MOCK_VIEWS)[number]
@@ -57,7 +58,10 @@ export function mockSnapshotFor(view: MockView): unknown {
 export async function captureAllViews(win: BrowserWindow, outDir: string): Promise<string[]> {
   mkdirSync(outDir, { recursive: true })
   const files: string[] = []
+  win.setResizable(true) // Linux 合成器按尺寸提示拦截缩小；截图期间放开，确保能缩回小视图
   for (const view of MOCK_VIEWS) {
+    const size = SIZES[view] ?? SIZES.main
+    win.setSize(size[0], size[1])
     win.webContents.send('lux:mock-view', view, mockSnapshotFor(view))
     await new Promise(r => setTimeout(r, 400)) // 等一次渲染+动效
     const image = await win.webContents.capturePage()

@@ -43,7 +43,6 @@ export function App(): React.JSX.Element {
     })
     const offOpen = bridge.onOpenView(v => {
       setView(v as View)
-      bridge.setWindowState(v)
     })
     return () => {
       offSnap()
@@ -51,6 +50,11 @@ export function App(): React.JSX.Element {
       offOpen()
     }
   }, [])
+
+  // 视图变化统一驱动窗口尺寸（快照驱动与手动切换都经此；none 不调整）
+  useEffect(() => {
+    if (view !== 'none') bridge.setWindowState(view)
+  }, [view])
 
   if (view === 'none') {
     return <div className="placeholder">等待进入选人…</div>
@@ -62,7 +66,6 @@ export function App(): React.JSX.Element {
           void bridge.setConfig({ onboarded: true })
           setOnboarded(true)
           setView('main')
-          bridge.setWindowState('main')
         }}
       />
     )
@@ -72,7 +75,6 @@ export function App(): React.JSX.Element {
       <Settings
         onClose={() => {
           setView('main')
-          bridge.setWindowState('main')
         }}
       />
     )
@@ -94,15 +96,12 @@ export function App(): React.JSX.Element {
       snapshot={snapshot}
       onExpand={() => {
         setView('expanded')
-        bridge.setWindowState('expanded')
       }}
       onCollapse={() => {
         setView('pill')
-        bridge.setWindowState('pill')
       }}
       onSettings={() => {
         setView('settings')
-        bridge.setWindowState('settings')
       }}
     />
   )

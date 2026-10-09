@@ -40,6 +40,7 @@ const bridge = {
   getManifest: () => ipcRenderer.invoke('lux:get-manifest'),
   syncNow: () => ipcRenderer.invoke('lux:sync-now'),
   quit: () => ipcRenderer.invoke('lux:quit'),
+  pickLcuDir: () => ipcRenderer.invoke('lux:pick-lcu-dir'),
 }
 
 contextBridge.exposeInMainWorld('lux', bridge)

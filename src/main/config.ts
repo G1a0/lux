@@ -8,6 +8,8 @@ export interface AppConfig {
   modes: { rift: boolean; aram: boolean }
   onboarded: boolean
   windowPos: { x: number; y: number } | null
+  /** 手动指定的客户端目录；缺省 = 自动发现 */
+  lcuDir?: string
 }
 
 export const DEFAULT_CONFIG: AppConfig = {

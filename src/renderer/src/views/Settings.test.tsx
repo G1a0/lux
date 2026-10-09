@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, fireEvent } from '@testing-library/react'
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { Settings } from './Settings'
 import { createInertBridge } from '../bridge'
 
@@ -30,5 +30,35 @@ describe('Settings', () => {
     render(<Settings onClose={vi.fn()} />)
     fireEvent.click(await screen.findByText('立即同步'))
     expect(await screen.findByText('同步结束：synced')).toBeTruthy()
+  })
+
+  it('回填已保存的手动客户端目录', async () => {
+    const dir = 'D:\\Games\\LoL\\LeagueClient'
+    ;(window as unknown as { lux: unknown }).lux = {
+      ...createInertBridge(),
+      getConfig: async () => ({ ownedFilter: true, modes: { rift: true, aram: true }, onboarded: true, lcuDir: dir }),
+      getManifest: async () => null,
+    }
+    render(<Settings onClose={vi.fn()} />)
+    const input = (await screen.findByPlaceholderText('自动发现')) as HTMLInputElement
+    await waitFor(() => expect(input.value).toBe(dir))
+  })
+
+  it('浏览…通过文件夹选择器写入目录并保存', async () => {
+    const picked = 'E:\\Lol\\LeagueClient'
+    // 真实 set-config 返回合并后的完整配置；mock 同样返回全量，避免部分配置导致渲染崩溃
+    const setConfig = vi.fn(async (p: Record<string, unknown>) => ({
+      ownedFilter: true, modes: { rift: true, aram: true }, onboarded: true, ...p,
+    }))
+    ;(window as unknown as { lux: unknown }).lux = {
+      ...createInertBridge(),
+      getConfig: async () => ({ ownedFilter: true, modes: { rift: true, aram: true }, onboarded: true }),
+      setConfig,
+      getManifest: async () => null,
+      pickLcuDir: async () => picked,
+    }
+    render(<Settings onClose={vi.fn()} />)
+    fireEvent.click(await screen.findByText('浏览…'))
+    await waitFor(() => expect(setConfig).toHaveBeenCalledWith({ lcuDir: picked }))
   })
 })

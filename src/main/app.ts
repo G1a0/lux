@@ -54,7 +54,10 @@ export function createAppWithPaths(
     source = io.createSource()
     lcuInfo = () => null // 注入假源：不暴露真实 LCU 诊断
   } else {
-    const advisor = createLcuAdvisor({ compute: () => ({ kind: 'none', sessionQueueId: 0 }) as never })
+    const advisor = createLcuAdvisor({
+      compute: () => ({ kind: 'none', sessionQueueId: 0 }) as never,
+      lcuDirOverride: config.get().lcuDir || undefined,
+    })
     source = {
       start: () => advisor.start(),
       stop: () => advisor.stop(),

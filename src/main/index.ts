@@ -63,6 +63,15 @@ function wireIpc(win: BrowserWindow, manager: WindowManager): void {
   ipcMain.handle('lux:get-manifest', () => service.getManifest())
   ipcMain.handle('lux:sync-now', () => service.syncNow())
   ipcMain.handle('lux:quit', () => app.quit())
+  // 手动指定客户端目录：自动发现失败（AV 拦截 PowerShell/超时）时的逃生口
+  ipcMain.handle('lux:pick-lcu-dir', async () => {
+    const { dialog } = await import('electron')
+    const result = await dialog.showOpenDialog(win, {
+      title: '选择英雄联盟客户端目录（含 lockfile 的 LeagueClient 文件夹）',
+      properties: ['openDirectory'],
+    })
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
   // 视图 → 窗口尺寸/显隐（renderer 切视图时上报）
   ipcMain.on('lux:set-window-state', (_e, state: string) => manager.setView(state))
   ipcMain.on('lux:set-pinned', (_e, pinned: boolean) => manager.setPinned(!!pinned))

@@ -59,6 +59,9 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
                 ? '未发现游戏客户端。请先启动英雄联盟；若已启动，请将下方信息反馈：'
                 : '已连接客户端，等待进入选人…'}
             </div>
+            {lcuInfo.status === 'waiting' && (
+              <div className="dim">若长时间未发现，可在设置中手动指定客户端目录。</div>
+            )}
             <div className="dim">客户端目录：{lcuInfo.lockDir ?? '已尝试的常见路径均未命中'}</div>
             <div className="dim">端口：{lcuInfo.port ?? '未知'}</div>
             {lcuInfo.lastError && <div className="dim">{lcuInfo.lastError.slice(0, 120)}</div>}

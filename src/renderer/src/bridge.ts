@@ -26,6 +26,7 @@ export interface UiBridge {
   onSyncProgress(cb: (done: number, total: number) => void): () => void
   onLcuInfo(cb: (info: LcuInfo | null) => void): () => void
   quit(): void
+  pickLcuDir(): Promise<string | null>
 }
 
 declare global {
@@ -57,5 +58,6 @@ export function createInertBridge(): UiBridge {
     onSyncProgress: () => () => {},
     onLcuInfo: () => () => {},
     quit: () => {},
+    pickLcuDir: async () => null,
   }
 }

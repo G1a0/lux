@@ -45,6 +45,9 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
   const debounceMs = options.debounceMs ?? 300
 
   let lcuDir = options.lcuDirOverride
+  // 命中目录记忆（tryConnect 成功时记录，含进程扫描回退）：lcuDir 未设置时供 tick 存活检查兜底。
+  // 否则 tick 会以 undefined 重扫候选（miss）→ 进程扫描（30s 限流内直接 miss）→ 误判客户端已退出，闪连；不随 disconnect 清空。
+  let discoveredDir: string | null = null
   let http: LcuHttp | null = null
   let readers: LcuReaders | null = null
   let socket: LcuEventSocket | null = null
@@ -131,6 +134,7 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     const lock = discoverLockfile({ envDir: lcuDir })
     if (!lock) return false
 
+    discoveredDir = lock.dir
     info = { lockDir: lock.dir, port: lock.port }
     lastError = null
     http = createLcuHttp({ port: lock.port, password: lock.password })
@@ -160,8 +164,8 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
         if (http === null) {
           void tryConnect().then(ok => { if (!ok) setStatus('waiting') })
         } else {
-          // 客户端可能已退出：lockfile 消失 → 断开重等
-          const still = discoverLockfile({ envDir: lcuDir })
+          // 客户端可能已退出：lockfile 消失 → 断开重等（lcuDir 未设置时用记住的命中目录，避免进程扫描限流误判）
+          const still = discoverLockfile({ envDir: lcuDir ?? discoveredDir ?? undefined })
           if (!still) {
             disconnect()
           } else {

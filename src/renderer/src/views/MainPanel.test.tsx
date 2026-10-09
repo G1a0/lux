@@ -38,14 +38,14 @@ function dirProbe(overrides: Record<string, unknown> = {}): Record<string, unkno
   }
 }
 
-function renderWithLcuInfo(info: Record<string, unknown>): void {
+function renderWithLcuInfo(info: Record<string, unknown>, snapshot: UiSnapshot | null = null): void {
   ;(window as unknown as { lux: unknown }).lux = {
     onLcuInfo: (cb: (info: unknown) => void) => {
       cb(info)
       return () => {}
     },
   }
-  render(<MainPanel snapshot={null} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+  render(<MainPanel snapshot={snapshot} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
 }
 
 describe('MainPanel', () => {
@@ -108,7 +108,7 @@ describe('MainPanel', () => {
     renderWithLcuInfo(waitingInfo({ status: 'connected', lockDir: '', port: 54321 }))
     expect(await screen.findByText(/（来自客户端进程命令行）/)).toBeTruthy()
     expect(screen.queryByText(/已尝试的常见路径均未命中/)).toBeNull()
-    expect(await screen.findByText(/端口：54321/)).toBeTruthy()
+    expect(await screen.findByText('状态：已连接（未进入选人） · 端口：54321')).toBeTruthy()
   })
 
   it('lockDir 非空时展示实际目录', async () => {
@@ -119,6 +119,40 @@ describe('MainPanel', () => {
   it('展示进程探测摘要（自动探测行；waiting 且有 processNote 时）', async () => {
     renderWithLcuInfo(waitingInfo({ processNote: '未发现正在运行的 LeagueClientUx / LeagueClient 进程' }))
     expect(await screen.findByText(/自动探测：未发现正在运行的 LeagueClientUx \/ LeagueClient 进程/)).toBeTruthy()
+  })
+
+  it('none(aram-pre-pick)：提示已进入大乱斗选人；状态行显示已进入选人', async () => {
+    renderWithLcuInfo(
+      waitingInfo({ status: 'in-champ-select', port: 61187 }),
+      { kind: 'none', reason: 'aram-pre-pick' },
+    )
+    expect(await screen.findByText('已进入大乱斗选人——请选择/确认你的英雄，随后将给出建议。')).toBeTruthy()
+    expect(await screen.findByText('状态：已进入选人 · 端口：61187')).toBeTruthy()
+  })
+
+  it('none(compute-error)：提示计算失败请截图反馈', async () => {
+    renderWithLcuInfo(waitingInfo({ status: 'in-champ-select', port: 61187 }), { kind: 'none', reason: 'compute-error' })
+    expect(await screen.findByText('已检测到选人，但建议计算失败——请将本窗口截图反馈。')).toBeTruthy()
+  })
+
+  it('none(mode-off)：提示模式已在设置中关闭', async () => {
+    renderWithLcuInfo(waitingInfo({ status: 'in-champ-select' }), { kind: 'none', reason: 'mode-off' })
+    expect(await screen.findByText('已检测到选人；该模式已在设置中关闭（可在设置中开启）。')).toBeTruthy()
+  })
+
+  it('none 无 reason 且已连接：保持"已连接客户端，等待进入选人…"', async () => {
+    renderWithLcuInfo(waitingInfo({ status: 'connected', port: 54321 }), { kind: 'none' })
+    expect(await screen.findByText('已连接客户端，等待进入选人…')).toBeTruthy()
+  })
+
+  it('状态行：waiting → 未发现客户端 · 端口未知', async () => {
+    renderWithLcuInfo(waitingInfo())
+    expect(await screen.findByText('状态：未发现客户端 · 端口：未知')).toBeTruthy()
+  })
+
+  it('状态行：未知 status 原样显示', async () => {
+    renderWithLcuInfo(waitingInfo({ status: 'connecting' }))
+    expect(await screen.findByText('状态：connecting · 端口：未知')).toBeTruthy()
   })
 
   it('一键应用按钮调用桥', async () => {

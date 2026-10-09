@@ -157,12 +157,13 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
 
       const aramInput = mapAramInput(session)
       const isAram = session.queueId === 450
-      if (isAram && !aramInput) return emit({ kind: 'none' }) // 大乱斗尚未分配到英雄：等待态，勿误报"不支持"
+      // 大乱斗尚未分配到英雄：等待态，勿误报"不支持"（reason 供界面区分"已进入选人但还没英雄可推荐"）
+      if (isAram && !aramInput) return emit({ kind: 'none', reason: 'aram-pre-pick' })
       // 支持判定走真实映射（与下游 compute 同源）；两者皆 null 才视为不支持
       const supported = aramInput !== null || mapRiftContext(session) !== null
 
       if (isAram && aramInput) {
-        if (!config.modes.aram) return emit({ kind: 'none' })
+        if (!config.modes.aram) return emit({ kind: 'none', reason: 'mode-off' })
         try {
           const aram = deps.computeAram(session, config)
           return emit({
@@ -177,11 +178,11 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
           })
         } catch (error) {
           console.warn('[service] ARAM 计算失败：', error)
-          return emit({ kind: 'none' })
+          return emit({ kind: 'none', reason: 'compute-error' })
         }
       }
       if (!supported) return emit({ kind: 'unsupported', queueId: session.queueId })
-      if (!config.modes.rift) return emit({ kind: 'none' })
+      if (!config.modes.rift) return emit({ kind: 'none', reason: 'mode-off' })
       try {
         const advice = deps.computeRift(session, config, caches)
         emit({
@@ -192,7 +193,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
         })
       } catch (error) {
         console.warn('[service] 推荐计算失败：', error)
-        emit({ kind: 'none' })
+        emit({ kind: 'none', reason: 'compute-error' })
       }
     },
     onSnapshot(handler) {

@@ -171,10 +171,11 @@ describe('CompanionService', () => {
       syncRunner: async () => ({ status: 'synced' }),
       dataRoot: '/tmp/lux-data',
     })
-    const seen: { kind: string }[] = []
-    service.onSnapshot(s => seen.push(s as { kind: string }))
+    const seen: { kind: string; reason?: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string; reason?: string }))
     service.handleSession(SESSION_RIFT)
     expect(seen[0].kind).toBe('none')
+    expect(seen[0].reason).toBe('mode-off') // 模式被关：与"未连接/未进选人"区分
   })
 
   it('syncNow 透传 runner 结果并广播进度', async () => {
@@ -200,12 +201,77 @@ describe('CompanionService', () => {
     ])
   })
 
-  it('大乱斗未分配英雄（championId 0）→ 等待态 none，而非 unsupported', () => {
+  it('大乱斗未分配英雄（championId 0）→ 等待态 none（reason: aram-pre-pick），而非 unsupported', () => {
     const { service } = makeService()
-    const seen: { kind: string }[] = []
-    service.onSnapshot(s => seen.push(s as { kind: string }))
+    const seen: { kind: string; reason?: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string; reason?: string }))
     service.handleSession({ ...SESSION_BASE, queueId: 450 } as never) // SESSION_BASE 本地玩家 championId 为 0
     expect(seen[0].kind).toBe('none')
+    expect(seen[0].reason).toBe('aram-pre-pick') // 已进入选人但尚无英雄可推荐：与"未连接"区分
+  })
+
+  it('大乱斗模式开关关闭 → none 且 reason 为 mode-off', () => {
+    const service = createCompanionService({
+      source: fakeSource(),
+      config: fakeConfig({ modes: { rift: true, aram: false } }),
+      computeRift: () => {
+        throw new Error('不应被调用')
+      },
+      computeAram: () => {
+        throw new Error('不应被调用')
+      },
+      syncRunner: async () => ({ status: 'synced' }),
+      dataRoot: '/tmp/lux-data',
+    })
+    const seen: { kind: string; reason?: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string; reason?: string }))
+    service.handleSession(SESSION_ARAM)
+    expect(seen[0].kind).toBe('none')
+    expect(seen[0].reason).toBe('mode-off')
+  })
+
+  it('大乱斗计算抛错 → none 且 reason 为 compute-error', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const service = createCompanionService({
+      source: fakeSource(),
+      config: fakeConfig(),
+      computeRift: () => {
+        throw new Error('不应被调用')
+      },
+      computeAram: () => {
+        throw new Error('boom')
+      },
+      syncRunner: async () => ({ status: 'synced' }),
+      dataRoot: '/tmp/lux-data',
+    })
+    const seen: { kind: string; reason?: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string; reason?: string }))
+    service.handleSession(SESSION_ARAM)
+    expect(seen[0].kind).toBe('none')
+    expect(seen[0].reason).toBe('compute-error')
+    warn.mockRestore()
+  })
+
+  it('rift 计算抛错 → none 且 reason 为 compute-error', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const service = createCompanionService({
+      source: fakeSource(),
+      config: fakeConfig(),
+      computeRift: () => {
+        throw new Error('boom')
+      },
+      computeAram: () => {
+        throw new Error('不应被调用')
+      },
+      syncRunner: async () => ({ status: 'synced' }),
+      dataRoot: '/tmp/lux-data',
+    })
+    const seen: { kind: string; reason?: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string; reason?: string }))
+    service.handleSession(SESSION_RIFT)
+    expect(seen[0].kind).toBe('none')
+    expect(seen[0].reason).toBe('compute-error')
+    warn.mockRestore()
   })
 
   it('切换模式开关立即重发快照', () => {
@@ -244,6 +310,7 @@ describe('CompanionService', () => {
     service.handleSession(SESSION_RIFT)
     service.setConfig({ modes: { rift: false, aram: true } })
     expect(seen.map(s => s.kind)).toEqual(['rift', 'none'])
+    expect((seen[1] as { kind: string; reason?: string }).reason).toBe('mode-off')
   })
 
   it('syncNow 并发调用单飞（不重复发起）', async () => {
@@ -292,7 +359,9 @@ describe('CompanionService', () => {
     service.start()
     service.handleSession(SESSION_RIFT)
     source.emitStatus('connected')
-    expect((events[events.length - 1] as { kind: string }).kind).toBe('none')
+    const away = events[events.length - 1] as { kind: string; reason?: string }
+    expect(away.kind).toBe('none')
+    expect(away.reason).toBeUndefined() // 状态回调的"离开选人"终态不带 reason（与"卡点"区分）
     // 离开时清空去重键：同一会话再次进入应重发（而非被去重吞掉）
     service.handleSession(SESSION_RIFT)
     expect((events[events.length - 1] as { kind: string }).kind).toBe('rift')

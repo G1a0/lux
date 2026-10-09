@@ -6,7 +6,7 @@ export type AdvicePayload =
   | { kind: 'rift'; queueId: number; advice: RiftAdvice; names?: Record<number, string> }
   | { kind: 'aram'; queueId: number; aram: AramJudgeResult; names?: Record<number, string> }
   | { kind: 'unsupported'; queueId: number }
-  | { kind: 'none' }
+  | { kind: 'none'; reason?: 'aram-pre-pick' | 'compute-error' | 'mode-off' }
 
 export interface ManifestInfo {
   patch: string

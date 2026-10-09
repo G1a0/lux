@@ -49,6 +49,27 @@ function targetDirHint(probe: LcuInfo['targetProbe']): string {
   return '（已找到 lockfile，连接中…）'
 }
 
+type NoneReason = Extract<UiSnapshot, { kind: 'none' }>['reason']
+
+/** none 快照头部文案：按 LCU 状态与 payload.reason 区分卡点（远程排障用） */
+function noneHeadline(status: string, reason: NoneReason): string {
+  if (status === 'waiting') return '未发现游戏客户端。请先启动英雄联盟；若已启动，请将下方信息反馈：'
+  if (reason === 'aram-pre-pick') return '已进入大乱斗选人——请选择/确认你的英雄，随后将给出建议。'
+  if (reason === 'compute-error') return '已检测到选人，但建议计算失败——请将本窗口截图反馈。'
+  if (reason === 'mode-off') return '已检测到选人；该模式已在设置中关闭（可在设置中开启）。'
+  return '已连接客户端，等待进入选人…'
+}
+
+/** LCU 连接状态 → 状态行中文标签；未知值原样显示 */
+function statusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    waiting: '未发现客户端',
+    connected: '已连接（未进入选人）',
+    'in-champ-select': '已进入选人',
+  }
+  return labels[status] ?? status
+}
+
 export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPanelProps): React.JSX.Element {
   const bridge = getBridge()
   const [applyMsg, setApplyMsg] = useState<string | null>(null)
@@ -63,6 +84,7 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
   useEffect(() => bridge.onLcuInfo(setLcuInfo), [])
 
   if (!snapshot || snapshot.kind === 'none') {
+    const noneReason = snapshot?.kind === 'none' ? snapshot.reason : undefined
     return (
       <div className="panel drag-region">
         <div className="panel-title no-drag">
@@ -75,11 +97,7 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
         <div className="dim">等待进入选人…</div>
         {lcuInfo && (
           <>
-            <div className="dim">
-              {lcuInfo.status === 'waiting'
-                ? '未发现游戏客户端。请先启动英雄联盟；若已启动，请将下方信息反馈：'
-                : '已连接客户端，等待进入选人…'}
-            </div>
+            <div className="dim">{noneHeadline(lcuInfo.status, noneReason)}</div>
             {lcuInfo.status === 'waiting' && (
               <div className="dim">若长时间未发现，可在设置中手动指定客户端目录。</div>
             )}
@@ -91,7 +109,7 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
             {lcuInfo.status === 'waiting' && lcuInfo.processNote && (
               <div className="dim">自动探测：{lcuInfo.processNote}</div>
             )}
-            <div className="dim">端口：{lcuInfo.port ?? '未知'}</div>
+            <div className="dim">状态：{statusLabel(lcuInfo.status)} · 端口：{lcuInfo.port ?? '未知'}</div>
             {lcuInfo.lastError && <div className="dim">{lcuInfo.lastError.slice(0, 120)}</div>}
           </>
         )}

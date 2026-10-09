@@ -1,7 +1,7 @@
 // LCU 仅有的两类写入（设计 §6）：符文页应用、召唤师技能携带。
 // keystone → 主系推导：8000s 精确；8100s 主宰；8200s 巫术；8300s 启迪；8400s 坚决；
 // 特例：9923（丛刃）属主宰 8100。
-import type { LcuHttp } from './http'
+import { LcuHttpError, type LcuHttp } from './http'
 
 const SUB_STYLE_IDS: Record<string, number> = {
   jm: 8000, // 精密
@@ -61,21 +61,34 @@ export async function applyRunePage(http: LcuHttp, page: RunePageInput): Promise
     current: true,
   }
 
-  // 保守清理：仅删除本应用此前创建的同前缀旧页（避免页数占满），失败不阻塞
+  // 优先就地更新自有页。旧策略「先删自有页再新建」会在自有页恰为当前页时失败：
+  // 客户端不允许删除 current 页，删除报错被吞后在页数已满时整体失败（真机反馈）。
+  // 就地 PUT（body 带 current:true）不依赖删除权限，且不占用新页位。
   try {
     const pages = (await http.get<PerkPage[]>('/lol-perks/v1/pages')) ?? []
-    for (const own of pages.filter(p => (p.name ?? '').startsWith(PAGE_NAME_PREFIX))) {
-      await http.del(`/lol-perks/v1/pages/${own.id}`)
+    const own = pages.filter(p => (p.name ?? '').startsWith(PAGE_NAME_PREFIX))
+    if (own.length > 0) {
+      await http.put<{ id: number }>(`/lol-perks/v1/pages/${own[0].id}`, body)
+      // 其余自有页尽力而为清理（单个失败忽略：例如仍为 current 页不可删），不阻塞本次应用
+      for (const stale of own.slice(1)) {
+        try {
+          await http.del(`/lol-perks/v1/pages/${stale.id}`)
+        } catch {
+          // 忽略：留着不影响本次应用
+        }
+      }
+      return { ok: true }
     }
   } catch {
-    // 列页失败：直接尝试创建
+    // 列页失败或更新失败：落入下方创建分支
   }
 
   try {
     await http.post<{ id: number }>('/lol-perks/v1/pages', body)
     return { ok: true }
-  } catch {
-    return { ok: false, reason: '符文页创建失败（可能页数已满），请手动在客户端设置' }
+  } catch (error) {
+    const status = error instanceof LcuHttpError ? error.status : 0
+    return { ok: false, reason: `符文页写入失败（HTTP ${status}）——若持续失败，请检查客户端符文页是否已满或手动设置` }
   }
 }
 

@@ -37,7 +37,7 @@ describe('subStyleCodeToStyleId', () => {
 })
 
 describe('applyRunePage', () => {
-  it('常规：自动加 Lux· 前缀并 POST 创建当前页（不删用户页）', async () => {
+  it('无自有页：自动加 Lux· 前缀并 POST 创建当前页（不删用户页）', async () => {
     const http = createLcuHttp({ port: mock.port, password: mock.password })
     const ok = await applyRunePage(http, {
       name: '阿卡丽',
@@ -57,7 +57,7 @@ describe('applyRunePage', () => {
     expect(mock.received.filter(r => r.method === 'DELETE')).toHaveLength(0)
   })
 
-  it('创建前只清理本应用旧页（Lux· 前缀），用户自建页不动', async () => {
+  it('有自有页：就地 PUT 更新（不 POST、不删页，用户自建页绝不被写）', async () => {
     await mock.stop()
     mock = await createMockLcu({
       certDir: CERT_DIR,
@@ -66,8 +66,8 @@ describe('applyRunePage', () => {
           handler: (_body, req) => {
             if (req.method === 'POST') return { json: { id: 9002 } }
             return { json: [
-              { id: 100, current: true, isDeletable: true, name: '我的自定义页' },
-              { id: 200, current: false, isDeletable: true, name: 'Lux·旧符文' },
+              { id: 100, current: false, isDeletable: true, name: '我的自定义页' },
+              { id: 200, current: true, isDeletable: false, name: 'Lux·旧符文' },
             ] }
           },
         },
@@ -76,15 +76,80 @@ describe('applyRunePage', () => {
     })
     const http = createLcuHttp({ port: mock.port, password: mock.password })
     const ok = await applyRunePage(http, {
+      name: '阿卡丽', keystoneId: 8112, subStyleCode: 'jj',
+      runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
+    })
+    expect(ok.ok).toBe(true)
+    const put = mock.received.find(r => r.method === 'PUT' && r.url === '/lol-perks/v1/pages/200')
+    expect(put?.body).toMatchObject({
+      name: 'Lux·阿卡丽',
+      primaryStyleId: 8100,
+      subStyleId: 8400,
+      selectedPerkIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
+      current: true,
+    })
+    expect(mock.received.some(r => r.method === 'POST')).toBe(false)
+    expect(mock.received.filter(r => r.method === 'DELETE')).toHaveLength(0)
+    // 用户自建页（非 Lux· 前缀）绝不被写（PUT/DELETE/PATCH 均无）
+    expect(mock.received.some(r => r.url === '/lol-perks/v1/pages/100')).toBe(false)
+  })
+
+  it('多个自有页：PUT 第一个（成为当前页），其余尽力 DELETE；用户页不动', async () => {
+    await mock.stop()
+    mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: {
+        '/lol-perks/v1/pages': {
+          handler: (_body, req) => {
+            if (req.method === 'POST') return { json: { id: 9003 } }
+            return { json: [
+              { id: 100, current: false, isDeletable: true, name: '我的自定义页' },
+              { id: 200, current: false, isDeletable: true, name: 'Lux·旧A' },
+              { id: 201, current: true, isDeletable: true, name: 'Lux·旧B' },
+            ] }
+          },
+        },
+        '/lol-perks/v1/pages/200': { status: 204 },
+        '/lol-perks/v1/pages/201': { status: 204 },
+      },
+    })
+    const http = createLcuHttp({ port: mock.port, password: mock.password })
+    const ok = await applyRunePage(http, {
       name: '测试', keystoneId: 8112, subStyleCode: 'jj',
       runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
     })
     expect(ok.ok).toBe(true)
-    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/200')).toBe(true)
-    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/100')).toBe(false)
+    expect(mock.received.some(r => r.method === 'PUT' && r.url === '/lol-perks/v1/pages/200')).toBe(true)
+    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/201')).toBe(true)
+    expect(mock.received.some(r => r.method === 'DELETE' && r.url === '/lol-perks/v1/pages/200')).toBe(false)
+    expect(mock.received.some(r => r.method === 'POST')).toBe(false)
+    expect(mock.received.some(r => r.url === '/lol-perks/v1/pages/100')).toBe(false)
   })
 
-  it('POST 失败且无自建旧页 → 不删任何页，返回可读原因', async () => {
+  it('PUT 失败 → 回退 POST 创建', async () => {
+    await mock.stop()
+    mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: {
+        '/lol-perks/v1/pages': {
+          handler: (_body, req) => {
+            if (req.method === 'POST') return { json: { id: 9004 } }
+            return { json: [{ id: 200, current: true, isDeletable: false, name: 'Lux·旧符文' }] }
+          },
+        },
+        '/lol-perks/v1/pages/200': { status: 500 },
+      },
+    })
+    const http = createLcuHttp({ port: mock.port, password: mock.password })
+    const ok = await applyRunePage(http, {
+      name: '测试', keystoneId: 8112, subStyleCode: 'jj',
+      runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
+    })
+    expect(ok.ok).toBe(true)
+    expect(mock.received.some(r => r.method === 'POST' && r.url === '/lol-perks/v1/pages')).toBe(true)
+  })
+
+  it('POST 失败（HTTP 400）→ 原因含状态码，不删任何页', async () => {
     await mock.stop()
     mock = await createMockLcu({
       certDir: CERT_DIR,
@@ -92,7 +157,7 @@ describe('applyRunePage', () => {
         '/lol-perks/v1/pages': {
           handler: (_body, req) =>
             req.method === 'POST'
-              ? { status: 500 }
+              ? { status: 400 }
               : { json: [{ id: 100, current: true, isDeletable: true, name: '我的自定义页' }] },
         },
       },
@@ -103,7 +168,8 @@ describe('applyRunePage', () => {
       runeIds: [8112, 8143, 8140, 8106, 8444, 8451, 5008, 5008, 5001],
     })
     expect(result.ok).toBe(false)
-    expect(result.reason).toContain('页数已满')
+    expect(result.reason).toContain('HTTP 400')
+    expect(result.reason).toContain('已满')
     expect(mock.received.filter(r => r.method === 'DELETE')).toHaveLength(0)
   })
 

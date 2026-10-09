@@ -361,6 +361,21 @@ describe('CompanionService', () => {
     expect(seen).toHaveLength(2)
   })
 
+  it('benchChampions 为纯数字数组时参与去重键（形状兼容）', () => {
+    const { service, events } = makeService()
+    const aramWithBench = (bench: number[]) =>
+      ({
+        ...SESSION_BASE,
+        queueId: 450,
+        benchEnabled: true,
+        myTeam: [{ ...SESSION_BASE.myTeam[0], championId: 15 }],
+        benchChampions: bench,
+      }) as never
+    service.handleSession(aramWithBench([84, 57]))
+    service.handleSession(aramWithBench([84, 86]))
+    expect(events).toHaveLength(2) // 旧实现 map(b => b.championId) 对数字项得 undefined，等长替补席键相同被误去重
+  })
+
   it('仅 Ban 变化也触发重发（去重键含 Ban）', () => {
     const { service, events } = makeService()
     service.handleSession(SESSION_RIFT)

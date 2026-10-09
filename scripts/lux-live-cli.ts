@@ -26,7 +26,7 @@ import { recommendRift } from '../shared/engine/recommend'
 import type { AramJudgeResult, RiftAdvice, RuneAdvice, SpellAdvice } from '../shared/engine/types'
 import { createLcuHttp, type LcuHttp } from '../shared/lcu/http'
 import { discoverLockfile, type LcuLockfile } from '../shared/lcu/lockfile'
-import { mapAramInput, mapRiftContext, proficiencyFromMastery } from '../shared/lcu/map-session'
+import { benchChampionIds, mapAramInput, mapRiftContext, proficiencyFromMastery } from '../shared/lcu/map-session'
 import { createMockLcu, type MockLcu } from '../shared/lcu/mock/server'
 import { createLcuReaders, type LcuReaders } from '../shared/lcu/readers'
 import { buildChampionIndex } from '../shared/lcu/resources'
@@ -186,7 +186,7 @@ function changeKey(session: ChampSelectSession): string {
     me: me ? me.championId : null,
     myTeam: session.myTeam.map(p => p.championId),
     theirTeam: session.theirTeam.map(p => p.championId),
-    bench: session.benchChampions.map(b => b.championId),
+    bench: benchChampionIds(session),
     rerolls: session.rerollsRemaining,
     bans: [...session.bans.myTeamBans, ...session.bans.theirTeamBans],
   })

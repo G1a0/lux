@@ -1,7 +1,7 @@
 // 应用核心（无 Electron 依赖，可无头测试）：
 // 会话→（模式开关）→引擎计算→快照广播；配置读写；一键应用；数据同步（手动/定时）。
 import type { ChampSelectSession } from '../../shared/lcu/types'
-import { mapAramInput, mapRiftContext, proficiencyFromMastery } from '../../shared/lcu/map-session'
+import { benchChampionIds, mapAramInput, mapRiftContext, proficiencyFromMastery } from '../../shared/lcu/map-session'
 import { applyRunePage, carrySpells } from '../../shared/lcu/writers'
 import { LcuHttpError, type LcuHttp } from '../../shared/lcu/http'
 import type { LcuReaders } from '../../shared/lcu/readers'
@@ -155,7 +155,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
     handleSession(session) {
       lastSession = session
       const config = deps.config.get()
-      const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.myTeam.map(p => p.assignedPosition).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}|${session.bans.myTeamBans.join(',')}|${session.bans.theirTeamBans.join(',')}`
+      const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.myTeam.map(p => p.assignedPosition).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${benchChampionIds(session).join(',')}|${session.rerollsRemaining}|${session.bans.myTeamBans.join(',')}|${session.bans.theirTeamBans.join(',')}`
       if (key === lastKey) return
       lastKey = key
 

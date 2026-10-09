@@ -44,6 +44,13 @@ export function mapRiftContext(session: ChampSelectSession, extras: MapExtras = 
   }
 }
 
+/** 备战席英雄 id：兼容 number[] 与 {championId}[] 两种形状，过滤无效值（<=0/缺 championId） */
+export function benchChampionIds(session: ChampSelectSession): number[] {
+  return session.benchChampions
+    .map(b => (typeof b === 'number' ? b : b.championId))
+    .filter(id => id > 0)
+}
+
 /** 大乱斗（450）→ 换/留判定输入；当前英雄未就绪 → null */
 export function mapAramInput(session: ChampSelectSession): AramJudgeInput | null {
   if (session.queueId !== 450) return null
@@ -52,9 +59,7 @@ export function mapAramInput(session: ChampSelectSession): AramJudgeInput | null
 
   return {
     current: me.championId,
-    bench: session.benchEnabled
-      ? session.benchChampions.map(b => b.championId).filter(id => id > 0 && id !== me.championId)
-      : [],
+    bench: session.benchEnabled ? benchChampionIds(session).filter(id => id !== me.championId) : [],
     diceLeft: session.rerollsRemaining,
     allies: session.myTeam.filter(p => p.cellId !== session.localPlayerCellId && p.championId > 0).map(p => p.championId),
     enemies: session.theirTeam.filter(p => p.championId > 0).map(p => p.championId),

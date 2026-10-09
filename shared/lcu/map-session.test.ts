@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { mapAramInput, mapRiftContext, proficiencyFromMastery } from './map-session'
+import { benchChampionIds, mapAramInput, mapRiftContext, proficiencyFromMastery } from './map-session'
 import type { ChampSelectSession } from './types'
 
 const fixture = (name: string) =>
@@ -43,6 +43,18 @@ describe('mapRiftContext', () => {
     const session = fixture('session-aram.json')
     session.benchEnabled = false
     expect(mapAramInput(session)!.bench).toEqual([])
+  })
+
+  it('benchChampions 兼容纯数字数组（国服序列化差异）；当前英雄仍被排除', () => {
+    const session = fixture('session-aram.json')
+    session.benchChampions = [711, 84, 57] // 711 = 当前英雄
+    expect(mapAramInput(session)!.bench).toEqual([84, 57])
+  })
+
+  it('benchChampionIds：兼容两种形状并过滤无效值', () => {
+    const session = fixture('session-aram.json')
+    session.benchChampions = [84, 0, { championId: 57, isPriority: false }, { championId: -1 }]
+    expect(benchChampionIds(session)).toEqual([84, 57])
   })
 
   it('熟练度折算 0-100 并可注入上下文', () => {

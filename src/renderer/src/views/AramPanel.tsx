@@ -59,6 +59,7 @@ export function AramPanel({ snapshot }: AramPanelProps): React.JSX.Element {
                 id={b.championId}
                 size={24}
                 active={aram.action === 'swap' && aram.swapTo?.championId === b.championId}
+                name={name(b.championId)}
               />
             </span>
           ))}

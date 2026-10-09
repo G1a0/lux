@@ -6,10 +6,12 @@ export interface ChampIconProps {
   size?: number
   /** 高亮（替补席上被建议换入的目标） */
   active?: boolean
+  /** 图标不可用时的文字兜底（英雄名小标签） */
+  name?: string
 }
 
-/** 英雄头像：经桥向主进程要 LCU 本地图标（data URL）；拿不到则渲染空（纯文本降级） */
-export function ChampIcon({ id, size = 28, active = false }: ChampIconProps): React.JSX.Element | null {
+/** 英雄头像：经桥向主进程要 LCU 本地图标（data URL）；拿不到时若有 name 渲染文字标签，否则渲染空 */
+export function ChampIcon({ id, size = 28, active = false, name }: ChampIconProps): React.JSX.Element | null {
   const [url, setUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -28,7 +30,16 @@ export function ChampIcon({ id, size = 28, active = false }: ChampIconProps): Re
     }
   }, [id])
 
-  if (!url) return null
+  if (!url) {
+    if (name) {
+      return (
+        <span className="champ-chip" title={name}>
+          {name}
+        </span>
+      )
+    }
+    return null
+  }
   return (
     <img
       className={active ? 'champ-icon champ-icon-active' : 'champ-icon'}

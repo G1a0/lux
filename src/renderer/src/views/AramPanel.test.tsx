@@ -19,6 +19,24 @@ const snap: UiSnapshot = {
   },
 }
 
+const benchSnap: UiSnapshot = {
+  kind: 'aram',
+  queueId: 450,
+  names: { 711: '薇克丝', 22: '艾希', 57: '茂凯' },
+  aram: {
+    action: 'swap',
+    reason: '建议换 艾希：版本强势：大乱斗胜率 54.6%',
+    current: { championId: 711, score: 49.3, factors: [], dominantFactor: 'beginner', reason: '操作上手简单', partialData: false },
+    bench: [
+      { championId: 22, score: 66.4, factors: [], dominantFactor: 'strength', reason: '版本强势', partialData: false },
+      { championId: 57, score: 52.0, factors: [], dominantFactor: 'beginner', reason: '操作上手简单', partialData: false },
+    ],
+    swapTo: { championId: 22, score: 66.4, factors: [], dominantFactor: 'strength', reason: '版本强势', partialData: false },
+    runes: null,
+    spells: null,
+  },
+}
+
 afterEach(() => {
   cleanup()
   delete (window as { lux?: unknown }).lux
@@ -35,23 +53,6 @@ describe('AramPanel', () => {
   it('替补席：渲染头像行（title 为英雄名），swap 目标高亮；建议行展示换入头像', async () => {
     const getChampionIcon = vi.fn(async (id: number) => `data:image/png;base64,ID${id}`)
     ;(window as unknown as { lux: unknown }).lux = { getChampionIcon }
-    const benchSnap: UiSnapshot = {
-      kind: 'aram',
-      queueId: 450,
-      names: { 711: '薇克丝', 22: '艾希', 57: '茂凯' },
-      aram: {
-        action: 'swap',
-        reason: '建议换 艾希：版本强势：大乱斗胜率 54.6%',
-        current: { championId: 711, score: 49.3, factors: [], dominantFactor: 'beginner', reason: '操作上手简单', partialData: false },
-        bench: [
-          { championId: 22, score: 66.4, factors: [], dominantFactor: 'strength', reason: '版本强势', partialData: false },
-          { championId: 57, score: 52.0, factors: [], dominantFactor: 'beginner', reason: '操作上手简单', partialData: false },
-        ],
-        swapTo: { championId: 22, score: 66.4, factors: [], dominantFactor: 'strength', reason: '版本强势', partialData: false },
-        runes: null,
-        spells: null,
-      },
-    }
     const { container } = render(<AramPanel snapshot={benchSnap} />)
     await waitFor(() => {
       expect(container.querySelectorAll('.bench-row img.champ-icon')).toHaveLength(2)
@@ -63,6 +64,18 @@ describe('AramPanel', () => {
     expect(benchImgs[0]?.className).toContain('champ-icon-active')
     expect(benchImgs[1]?.className).not.toContain('champ-icon-active')
     expect(container.querySelector('.bench-row [title="艾希"]')).toBeTruthy()
+  })
+
+  it('头像不可用（桥返回 null）→ 替补席降级为英雄名 chip', async () => {
+    const getChampionIcon = vi.fn(async () => null)
+    ;(window as unknown as { lux: unknown }).lux = { getChampionIcon }
+    const { container } = render(<AramPanel snapshot={benchSnap} />)
+    await waitFor(() => {
+      expect(container.querySelectorAll('.bench-row .champ-chip')).toHaveLength(2)
+    })
+    const chips = [...container.querySelectorAll('.bench-row .champ-chip')]
+    expect(chips.map(c => c.textContent)).toEqual(['艾希', '茂凯']) // names 映射存在时显示真实名
+    expect(container.querySelectorAll('.bench-row img')).toHaveLength(0)
   })
 
   it('掷骰子判定且无符文/技能时显示暂无', () => {

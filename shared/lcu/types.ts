@@ -25,7 +25,8 @@ export interface ChampSelectAction {
 
 export interface ChampSelectSession {
   actions: ChampSelectAction[][]
-  benchChampions: { championId: number; isPriority: boolean }[]
+  /** 备战席：兼容 {championId}[] 与 number[] 两种形状（国服客户端序列化差异） */
+  benchChampions: Array<{ championId: number; isPriority?: boolean } | number>
   benchEnabled: boolean
   localPlayerCellId: number
   myTeam: ChampSelectPlayer[]

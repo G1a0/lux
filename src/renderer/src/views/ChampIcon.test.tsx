@@ -49,6 +49,28 @@ describe('ChampIcon', () => {
     expect(container.querySelector('img')).toBeNull()
   })
 
+  it('图标不可用且提供 name → 渲染英雄名 chip 兜底（title 同步）', async () => {
+    const getChampionIcon = vi.fn(async () => null)
+    setBridge(getChampionIcon)
+    const { container } = render(<ChampIcon id={22} name="艾希" />)
+    await waitFor(() => {
+      expect(container.querySelector('.champ-chip')).toBeTruthy()
+    })
+    const chip = container.querySelector('.champ-chip') as HTMLElement
+    expect(chip.textContent).toBe('艾希')
+    expect(chip.getAttribute('title')).toBe('艾希')
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('图标可用时优先渲染 img（name 仅作兜底）', async () => {
+    setBridge(async () => 'data:image/png;base64,AAAA')
+    const { container } = render(<ChampIcon id={22} name="艾希" />)
+    await waitFor(() => {
+      expect(container.querySelector('img.champ-icon')).toBeTruthy()
+    })
+    expect(container.querySelector('.champ-chip')).toBeNull()
+  })
+
   it('active 时带 champ-icon-active 高亮类', async () => {
     setBridge(async () => 'data:image/png;base64,AAAA')
     const { container } = render(<ChampIcon id={22} active />)

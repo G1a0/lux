@@ -31,6 +31,7 @@ body {
 .primary-row { display: flex; justify-content: space-between; align-items: baseline; }
 .champ-name { color: var(--gold-bright); font-size: 18px; font-weight: 700; }
 .champ-icon { border-radius: 4px; vertical-align: middle; flex: 0 0 auto; }
+.champ-chip { padding: 1px 4px; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 4px; font-size: 10px; white-space: nowrap; }
 .champ-name .champ-icon { margin-right: 6px; }
 .champ-icon-active { outline: 2px solid var(--gold-bright); outline-offset: 1px; }
 .bench-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getBridge, type UiSnapshot } from '../bridge'
+import { getBridge, type LcuInfo, type UiSnapshot } from '../bridge'
 
 const SPELL_NAMES: Record<number, string> = {
   1: '净化', 3: '虚弱', 4: '闪现', 6: '疾跑', 7: '治疗', 11: '惩戒', 12: '传送', 14: '点燃', 21: '护盾', 32: '标记',
@@ -31,11 +31,15 @@ function nameOf(id: number, snap: UiSnapshot | null): string {
 export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPanelProps): React.JSX.Element {
   const bridge = getBridge()
   const [applyMsg, setApplyMsg] = useState<string | null>(null)
+  // LCU 连接诊断（主进程 2s 推送）：等待/未发现客户端时展示命中路径与最近错误，供跨机器排障
+  const [lcuInfo, setLcuInfo] = useState<LcuInfo | null>(null)
 
   // 快照变化（换英雄/重算）时清除上一次的应用反馈
   useEffect(() => {
     setApplyMsg(null)
   }, [snapshot])
+
+  useEffect(() => bridge.onLcuInfo(setLcuInfo), [])
 
   if (!snapshot || snapshot.kind === 'none') {
     return (
@@ -48,6 +52,18 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
           </span>
         </div>
         <div className="dim">等待进入选人…</div>
+        {lcuInfo && (
+          <>
+            <div className="dim">
+              {lcuInfo.status === 'waiting'
+                ? '未发现游戏客户端。请先启动英雄联盟；若已启动，请将下方信息反馈：'
+                : '已连接客户端，等待进入选人…'}
+            </div>
+            <div className="dim">客户端目录：{lcuInfo.lockDir ?? '已尝试的常见路径均未命中'}</div>
+            <div className="dim">端口：{lcuInfo.port ?? '未知'}</div>
+            {lcuInfo.lastError && <div className="dim">{lcuInfo.lastError.slice(0, 120)}</div>}
+          </>
+        )}
       </div>
     )
   }

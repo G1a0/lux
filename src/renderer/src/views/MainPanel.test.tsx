@@ -31,6 +31,19 @@ describe('MainPanel', () => {
     expect(screen.getByText(/点燃 \+ 闪现/)).toBeTruthy()
   })
 
+  it('无快照时展示 LCU 连接诊断（未发现文案 + 路径提示 + 最近错误）', async () => {
+    ;(window as unknown as { lux: unknown }).lux = {
+      onLcuInfo: (cb: (info: unknown) => void) => {
+        cb({ status: 'waiting', lockDir: null, port: null, lastError: 'connect ECONNREFUSED 127.0.0.1:54321' })
+        return () => {}
+      },
+    }
+    render(<MainPanel snapshot={null} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+    expect(await screen.findByText(/未发现游戏客户端/)).toBeTruthy()
+    expect(await screen.findByText(/已尝试的常见路径均未命中/)).toBeTruthy()
+    expect(await screen.findByText(/connect ECONNREFUSED 127\.0\.0\.1:54321/)).toBeTruthy()
+  })
+
   it('一键应用按钮调用桥', async () => {
     const applyRunes = vi.fn(async () => ({ ok: true }))
     const applySpells = vi.fn(async () => true)

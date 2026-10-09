@@ -1,5 +1,8 @@
 // renderer 侧桥接口：生产走 preload 暴露的 window.lux；LUX_UI_MOCK/浏览器开发时降级为本地 mock。
 import type { RiftAdvice, AramJudgeResult } from '../../../shared/engine/types'
+import type { LcuInfo } from '../../ipc-types'
+
+export type { LcuInfo }
 
 export type UiSnapshot =
   | { kind: 'rift'; queueId: number; advice: RiftAdvice; names?: Record<number, string> }
@@ -21,6 +24,7 @@ export interface UiBridge {
   getManifest(): Promise<Record<string, unknown> | null>
   syncNow(): Promise<Record<string, unknown>>
   onSyncProgress(cb: (done: number, total: number) => void): () => void
+  onLcuInfo(cb: (info: LcuInfo | null) => void): () => void
   quit(): void
 }
 
@@ -51,6 +55,7 @@ export function createInertBridge(): UiBridge {
     getManifest: async () => null,
     syncNow: async () => ({ status: 'unavailable' }),
     onSyncProgress: () => () => {},
+    onLcuInfo: () => () => {},
     quit: () => {},
   }
 }

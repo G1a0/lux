@@ -43,7 +43,7 @@ function createMockWindow(): BrowserWindow {
 
 function wireIpc(win: BrowserWindow, manager: WindowManager): void {
   if (!bundle) return
-  const { service } = bundle
+  const { service, lcuInfo } = bundle
   service.onSnapshot(s => win.webContents.send('lux:snapshot', s))
   service.onStatus(s => {
     win.webContents.send('lux:status', s)
@@ -52,6 +52,9 @@ function wireIpc(win: BrowserWindow, manager: WindowManager): void {
     if (s !== 'in-champ-select') manager.setPinned(false) // 离开选人自动取消托盘钉住
   })
   service.onSyncProgress((d, t) => win.webContents.send('lux:sync-progress', d, t))
+  // LCU 连接诊断：等待态无快照事件，按 2s 周期推送（量小、便于跨机器排障）
+  const lcuTimer = setInterval(() => win.webContents.send('lux:lcu-info', lcuInfo()), 2000)
+  win.on('closed', () => clearInterval(lcuTimer))
 
   ipcMain.handle('lux:apply-runes', () => service.applyRunes())
   ipcMain.handle('lux:apply-spells', () => service.applySpells())

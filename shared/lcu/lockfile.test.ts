@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { discoverLockfile, parseLockfile } from './lockfile'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { __resetLockfileScanCacheForTest, discoverLockfile, parseLockfile } from './lockfile'
 
 describe('parseLockfile', () => {
   it('解析 5 段格式', () => {
@@ -36,6 +36,7 @@ describe('discoverLockfile', () => {
   afterEach(() => {
     for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
   })
+  beforeEach(() => __resetLockfileScanCacheForTest())
 
   it('LUX_LCU_DIR 覆盖优先且读取其中 lockfile 文件', () => {
     const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
@@ -43,6 +44,7 @@ describe('discoverLockfile', () => {
     writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:2345:pw:https')
     const found = discoverLockfile({ envDir: dir })
     expect(found?.port).toBe(2345)
+    expect(found?.dir).toBe(dir)
   })
 
   it('目录无 lockfile 或内容畸形时返回 null', () => {
@@ -59,6 +61,7 @@ describe('discoverLockfile', () => {
     writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:9999:pw:https')
     const found = discoverLockfile({ envDir: undefined, candidateDirs: [join(dir, '不存在'), dir] })
     expect(found?.port).toBe(9999)
+    expect(found?.dir).toBe(dir)
   })
 
   it('lockfile 存在但为空（0 字节，客户端未运行时的真实状态）→ null', () => {
@@ -80,5 +83,78 @@ describe('discoverLockfile', () => {
       if (prev === undefined) delete process.env.LUX_LCU_DIR
       else process.env.LUX_LCU_DIR = prev
     }
+  })
+
+  it('win32 候选全未命中时按运行进程目录查找（findClientDirs 注入）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:4321:pw:https')
+    const found = discoverLockfile({
+      envDir: undefined,
+      candidateDirs: [],
+      platform: 'win32',
+      findClientDirs: () => [dir],
+    })
+    expect(found?.port).toBe(4321)
+    expect(found?.dir).toBe(dir)
+  })
+
+  it('候选命中时不触发进程扫描（避免无谓 powershell 开销）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:5555:pw:https')
+    let calls = 0
+    const found = discoverLockfile({
+      envDir: undefined,
+      candidateDirs: [dir],
+      platform: 'win32',
+      findClientDirs: () => {
+        calls += 1
+        return []
+      },
+    })
+    expect(found?.dir).toBe(dir)
+    expect(calls).toBe(0)
+  })
+
+  it('进程扫描 30s 限流：限流期内不再扫描，重置后可再扫描', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:6666:pw:https')
+    let calls = 0
+    const opts = {
+      envDir: undefined,
+      candidateDirs: [],
+      platform: 'win32' as const,
+      findClientDirs: (): string[] => {
+        calls += 1
+        return [dir]
+      },
+    }
+    expect(discoverLockfile(opts)?.port).toBe(6666)
+    expect(calls).toBe(1)
+    expect(discoverLockfile(opts)).toBeNull() // 限流期内：跳过扫描
+    expect(calls).toBe(1)
+    __resetLockfileScanCacheForTest()
+    expect(discoverLockfile(opts)?.port).toBe(6666)
+    expect(calls).toBe(2)
+  })
+
+  it('非 win32 平台忽略进程扫描', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-'))
+    dirs.push(dir)
+    writeFileSync(join(dir, 'lockfile'), 'LeagueClient:1:8888:pw:https')
+    let calls = 0
+    const found = discoverLockfile({
+      envDir: undefined,
+      candidateDirs: [],
+      platform: 'darwin',
+      findClientDirs: () => {
+        calls += 1
+        return [dir]
+      },
+    })
+    expect(found).toBeNull()
+    expect(calls).toBe(0)
   })
 })

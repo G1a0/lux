@@ -20,3 +20,11 @@ export interface SyncOutcome {
   blockedUntil?: string
   patch?: string | null
 }
+
+/** LCU 连接诊断（主进程 2s 推送给 renderer，等待态 UI 展示，跨机器排障用） */
+export interface LcuInfo {
+  status: string
+  lockDir: string | null
+  port: number | null
+  lastError: string | null
+}

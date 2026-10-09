@@ -14,6 +14,7 @@ import { resolvePopulatedPatch, syncRiftData } from '../../shared/qq101/sync'
 import { createConfigStore, type ConfigStore } from './config'
 import { bootstrapDataRoot, resolveDataRoot } from './data-root'
 import { createCompanionService, type AdviceSource, type CompanionService } from './service'
+import type { LcuInfo } from '../ipc-types'
 
 export interface AppBundle {
   service: CompanionService
@@ -21,6 +22,8 @@ export interface AppBundle {
   config: ConfigStore
   dataRoot: string
   configDir: string
+  /** LCU 连接诊断（真实源）；注入假源时为 null（无 LCU 连接概念） */
+  lcuInfo: () => LcuInfo | null
 }
 
 export interface AppPaths {
@@ -46,8 +49,10 @@ export function createAppWithPaths(
   }
 
   let source: AdviceSource
+  let lcuInfo: () => LcuInfo | null
   if (io.createSource) {
     source = io.createSource()
+    lcuInfo = () => null // 注入假源：不暴露真实 LCU 诊断
   } else {
     const advisor = createLcuAdvisor({ compute: () => ({ kind: 'none', sessionQueueId: 0 }) as never })
     source = {
@@ -58,6 +63,7 @@ export function createAppWithPaths(
       http: () => advisor.http(),
       readers: () => advisor.readers(),
     }
+    lcuInfo = () => advisor.info() as LcuInfo
     // 客户端连上后构建英雄资源索引（每 2s 重试；仅成功后停止重试）
     const timer = setInterval(() => {
       const http = advisor.http()
@@ -108,7 +114,7 @@ export function createAppWithPaths(
     championName: id => datasetRef.current.champion(id)?.name ?? null,
   })
 
-  return { service, config, dataRoot: paths.dataRoot, configDir: paths.configDir }
+  return { service, config, dataRoot: paths.dataRoot, configDir: paths.configDir, lcuInfo }
 }
 
 export function createApp(): AppBundle {

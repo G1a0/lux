@@ -105,6 +105,35 @@ describe('LcuAdvisor', () => {
     }
   })
 
+  it('info() 连接后给出 lockDir/port，请求失败记录 lastError，断开后清空路径', async () => {
+    const mock = await createMockLcu({
+      certDir: CERT_DIR,
+      routes: { '/lol-champ-select/v1/session': { json: fixture('session-draft-mid.json') } },
+    })
+    servers.push(mock)
+    const advisor = createLcuAdvisor({
+      lcuDirOverride: mock.lcuDir,
+      discoverIntervalMs: 30,
+      debounceMs: 10,
+      compute: session => ({ kind: 'rift', sessionQueueId: session.queueId }),
+    })
+    try {
+      advisor.start()
+      const connected = await waitFor(() => (advisor.info().status === 'in-champ-select' ? advisor.info() : null))
+      expect(connected.lockDir).toBe(mock.lcuDir)
+      expect(connected.port).toBe(mock.port)
+      expect(connected.lastError).toBeNull()
+
+      await mock.stopServing() // 服务消失但 lockfile 残留（自愈同款路径）：请求失败 → lastError
+      await waitFor(() => (advisor.info().lastError !== null ? true : null))
+      expect(advisor.info().lastError).toBeTruthy()
+    } finally {
+      advisor.stop()
+    }
+    expect(advisor.info().lockDir).toBeNull() // 断开后路径信息清空
+    expect(advisor.info().status).toBe('waiting')
+  })
+
   it('compute 可返回 Promise（异步预取场景）', async () => {
     const mock = await createMockLcu({
       certDir: CERT_DIR,

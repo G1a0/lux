@@ -56,9 +56,7 @@ export function App(): React.JSX.Element {
     if (view !== 'none') bridge.setWindowState(view)
   }, [view])
 
-  if (view === 'none') {
-    return <div className="placeholder">等待进入选人…</div>
-  }
+  // 'none' 不再单独走占位符：落到 MainPanel 的等待分支（含 LCU 连接诊断，客户端未发现时可反馈信息）
   if (view === 'onboarding') {
     return (
       <Onboarding

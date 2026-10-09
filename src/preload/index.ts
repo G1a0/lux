@@ -26,6 +26,11 @@ const bridge = {
     ipcRenderer.on('lux:sync-progress', h)
     return () => ipcRenderer.removeListener('lux:sync-progress', h)
   },
+  onLcuInfo: (cb: (info: unknown) => void) => {
+    const h = (_e: unknown, info: unknown) => cb(info)
+    ipcRenderer.on('lux:lcu-info', h)
+    return () => ipcRenderer.removeListener('lux:lcu-info', h)
+  },
   applyRunes: () => ipcRenderer.invoke('lux:apply-runes'),
   applySpells: () => ipcRenderer.invoke('lux:apply-spells'),
   getConfig: () => ipcRenderer.invoke('lux:get-config'),

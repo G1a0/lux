@@ -36,6 +36,8 @@ export interface LcuAdvisor {
   setLcuDirForTest(dir: string): void
   http(): LcuHttp | null
   readers(): LcuReaders | null
+  /** 连接诊断（UI 展示用）：当前状态、命中目录/端口、最近一次请求错误 */
+  info(): { status: AdvisorStatus; lockDir: string | null; port: number | null; lastError: string | null }
 }
 
 export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
@@ -51,6 +53,9 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
   let status: AdvisorStatus = 'waiting'
   let running = false
   let consecutiveFailures = 0
+  // 连接诊断：连接成功记录命中目录/端口；请求失败记录最近错误（UI 反馈用，排障时无远程调试也能看）
+  let info: { lockDir: string; port: number } | null = null
+  let lastError: string | null = null
 
   const adviceHandlers = new Set<(snapshot: AdviceSnapshot) => void>()
   const statusHandlers = new Set<(status: AdvisorStatus) => void>()
@@ -67,6 +72,7 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     socket = null
     http = null
     readers = null
+    info = null // 断连后路径信息失效；lastError 保留供 UI 展示最近失败原因
     consecutiveFailures = 0
     setStatus('waiting')
   }
@@ -86,8 +92,10 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
       try {
         session = await readers.getChampSelectSession()
         consecutiveFailures = 0
-      } catch {
+        lastError = null
+      } catch (error) {
         // 客户端崩溃/重启常见于 lockfile 残留：连续失败即断开重扫（密码/端口已变）
+        lastError = String(error)
         consecutiveFailures += 1
         if (consecutiveFailures >= 3) disconnect()
         return
@@ -123,6 +131,8 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     const lock = discoverLockfile({ envDir: lcuDir })
     if (!lock) return false
 
+    info = { lockDir: lock.dir, port: lock.port }
+    lastError = null
     http = createLcuHttp({ port: lock.port, password: lock.password })
     readers = createLcuReaders(http)
     setStatus('connected')
@@ -180,5 +190,6 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     },
     http: () => http,
     readers: () => readers,
+    info: () => ({ status, lockDir: info?.lockDir ?? null, port: info?.port ?? null, lastError }),
   }
 }

@@ -125,6 +125,8 @@ export function createApp(): AppBundle {
     // 开发版无覆盖时 legacy === dataRoot（同一目录）：置 null，避免自拷贝
     legacyDir: legacy === resolved ? null : legacy,
     seedDir: app.isPackaged ? join(process.resourcesPath, 'data-seed') : null,
+    // 安装目录不可写时回退到 AppData（可能与 legacy 同路径，bootstrap 内部已避免自拷贝）
+    fallbackDir: join(app.getPath('userData'), 'data'),
   })
   return createAppWithPaths({ configDir, dataRoot })
 }

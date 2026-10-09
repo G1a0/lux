@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getBridge, type UiSnapshot } from '../bridge'
 
 const SPELL_NAMES: Record<number, string> = {
@@ -27,6 +27,11 @@ function nameOf(id: number, snap: UiSnapshot | null): string {
 export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPanelProps): React.JSX.Element {
   const bridge = getBridge()
   const [applyMsg, setApplyMsg] = useState<string | null>(null)
+
+  // 快照变化（换英雄/重算）时清除上一次的应用反馈
+  useEffect(() => {
+    setApplyMsg(null)
+  }, [snapshot])
 
   if (!snapshot || snapshot.kind === 'none') {
     return (

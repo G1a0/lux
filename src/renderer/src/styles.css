@@ -37,3 +37,6 @@ body {
 .actions { display: flex; gap: 8px; margin-top: auto; }
 .actions button { flex: 1; background: linear-gradient(180deg, #1e3a5f, #16283f); color: var(--gold-bright); border: 1px solid var(--border-gold); border-radius: 4px; padding: 6px 0; cursor: pointer; }
 .actions button:disabled { opacity: 0.4; cursor: default; }
+.alt-list { list-style: none; display: flex; flex-direction: column; gap: 8px; overflow: auto; }
+.alt-list li { border-top: 1px solid #1e2a3f; padding-top: 6px; }
+.pill { width: 100%; height: 100%; background: var(--bg-panel); color: var(--gold); border: 1px solid var(--border-gold); border-radius: 22px; font-size: 13px; cursor: pointer; }

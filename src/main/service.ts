@@ -66,6 +66,9 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
   const caches: RosterCaches = { owned: [], proficiency: {} }
   let rosterTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setInterval> | null = null
+  let syncInFlight: Promise<SyncOutcome> | null = null
+  let offAdvice: (() => void) | null = null
+  let offStatus: (() => void) | null = null
   let running = false
 
   const emit = (payload: AdvicePayload): void => {
@@ -93,9 +96,10 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
 
   const service: CompanionService = {
     start() {
+      if (running) return
       running = true
-      deps.source.onAdvice(snapshot => service.handleSession(snapshot.session))
-      deps.source.onStatus(status => statusHandlers.forEach(h => h(status)))
+      offAdvice = deps.source.onAdvice(snapshot => service.handleSession(snapshot.session))
+      offStatus = deps.source.onStatus(status => statusHandlers.forEach(h => h(status)))
       deps.source.start()
       void refreshRoster()
       rosterTimer = setInterval(() => {
@@ -111,12 +115,16 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       running = false
       if (rosterTimer) clearInterval(rosterTimer)
       if (syncTimer) clearInterval(syncTimer)
+      offAdvice?.()
+      offStatus?.()
+      offAdvice = null
+      offStatus = null
       deps.source.stop()
     },
     handleSession(session) {
       lastSession = session
       const config = deps.config.get()
-      const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}`
+      const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.myTeam.map(p => p.assignedPosition).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}`
       if (key === lastKey) return
       lastKey = key
 
@@ -196,13 +204,20 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       return next
     },
     getManifest: () => deps.manifestReader?.() ?? null,
-    async syncNow() {
-      try {
-        const result = await deps.syncRunner((done, total) => progressHandlers.forEach(h => h(done, total)))
-        return { status: result.status, patch: result.patch ?? null, blockedUntil: result.blockedUntil }
-      } catch {
-        return { status: 'failed', patch: null }
-      }
+    syncNow() {
+      // 单飞：定时器/手动/启动三路触发只保留一个进行中的同步（避免重复打向 101/WAF）
+      if (syncInFlight) return syncInFlight
+      syncInFlight = (async (): Promise<SyncOutcome> => {
+        try {
+          const result = await deps.syncRunner((done, total) => progressHandlers.forEach(h => h(done, total)))
+          return { status: result.status, patch: result.patch ?? null, blockedUntil: result.blockedUntil }
+        } catch {
+          return { status: 'failed', patch: null }
+        } finally {
+          syncInFlight = null
+        }
+      })()
+      return syncInFlight
     },
   }
   return service

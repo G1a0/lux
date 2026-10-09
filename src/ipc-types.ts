@@ -22,8 +22,8 @@ export interface ManifestInfo {
 }
 
 export interface SyncOutcome {
+  /** 'blocked-timegate' | 'synced' | 'up-to-date' | 'partial' | 'failed' | … */
   status: string
-  blockedByTimegate?: boolean
   blockedUntil?: string
   patch?: string | null
 }

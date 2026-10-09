@@ -924,6 +924,30 @@ describe('CompanionService', () => {
     expect(outcome.status).toBe('synced')
     expect(progress).toEqual([[1, 2], [2, 2]])
   })
+
+  it('大乱斗未分配英雄（championId 0）→ 等待态 none，而非 unsupported', () => {
+    const { service } = makeService()
+    const seen: { kind: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string }))
+    service.handleSession({ ...SESSION_BASE, queueId: 450 } as never) // SESSION_BASE 本地玩家 championId 为 0
+    expect(seen[0].kind).toBe('none')
+  })
+
+  it('切换模式开关立即重发快照', () => {
+    const service = createCompanionService({
+      source: fakeSource(),
+      config: fakeConfig(),
+      computeRift: () => ({ primary: { championId: 1, reason: 'x', score: 50, factors: [], dominantFactor: null, partialData: false }, alternates: [], runes: null, spells: null, ruleMode: false }),
+      computeAram: () => ({ action: 'keep', reason: 'y', current: { championId: 1 }, bench: [], swapTo: null, runes: null, spells: null }),
+      syncRunner: async () => ({ status: 'synced' }),
+      dataRoot: '/tmp/lux-data',
+    })
+    const seen: { kind: string }[] = []
+    service.onSnapshot(s => seen.push(s as { kind: string }))
+    service.handleSession(SESSION_RIFT)
+    service.setConfig({ modes: { rift: false, aram: true } })
+    expect(seen.map(s => s.kind)).toEqual(['rift', 'none'])
+  })
 })
 ```
 
@@ -999,6 +1023,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
 
   let lastPayload: AdvicePayload = { kind: 'none' }
   let lastKey = ''
+  let lastSession: ChampSelectSession | null = null
   const caches: RosterCaches = { owned: [], proficiency: {} }
   let rosterTimer: ReturnType<typeof setInterval> | null = null
   let syncTimer: ReturnType<typeof setInterval> | null = null
@@ -1027,10 +1052,10 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
     }
   }
 
-  return {
+  const service: CompanionService = {
     start() {
       running = true
-      deps.source.onAdvice(snapshot => this.handleSession(snapshot.session))
+      deps.source.onAdvice(snapshot => service.handleSession(snapshot.session))
       deps.source.onStatus(status => statusHandlers.forEach(h => h(status)))
       deps.source.start()
       void refreshRoster()
@@ -1046,14 +1071,16 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       deps.source.stop()
     },
     handleSession(session) {
+      lastSession = session
       const config = deps.config.get()
       const key = `${session.queueId}|${session.myTeam.map(p => p.championId).join(',')}|${session.theirTeam.map(p => p.championId).join(',')}|${session.benchChampions.map(b => b.championId).join(',')}|${session.rerollsRemaining}`
+      if (key === lastKey) return
+      lastKey = key
+
       const aramInput = mapAramInput(session)
       const isAram = session.queueId === 450
+      if (isAram && !aramInput) return emit({ kind: 'none' }) // 大乱斗尚未分配到英雄：等待态，勿误报"不支持"
       const supported = aramInput !== null || mapRiftContext(session) !== null
-      const effectiveKey = `${key}`
-      if (effectiveKey === lastKey) return
-      lastKey = effectiveKey
 
       if (isAram && aramInput) {
         if (!config.modes.aram) return emit({ kind: 'none' })
@@ -1115,7 +1142,15 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       return carrySpells(http, spells.spellIds)
     },
     getConfig: () => deps.config.get(),
-    setConfig: patch => deps.config.set(patch),
+    setConfig(patch) {
+      const next = deps.config.set(patch)
+      // 开关切换需即时反映：清 key 后按最近一次会话重算并重发快照
+      if (lastSession && (patch.modes !== undefined || patch.ownedFilter !== undefined)) {
+        lastKey = ''
+        service.handleSession(lastSession)
+      }
+      return next
+    },
     getManifest: () => deps.manifestReader?.() ?? null,
     async syncNow() {
       try {
@@ -1126,6 +1161,7 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
       }
     },
   }
+  return service
 }
 ```
 

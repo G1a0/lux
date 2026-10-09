@@ -1,6 +1,5 @@
 # Lux v2 Phase 1（数据侦察 + 数据层）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 为 Lux v2 独立应用搭好脚手架并交付可运行的 101.qq.com 数据层：时段门控、本地数据仓、Node 客户端、同步器与 CLI。
 
@@ -197,7 +196,7 @@ git show archive/pengu-loader-plugin:src/lib/positions.test.ts > shared/position
 
 - [ ] **Step 7: 写新的 README.md**
 
-（旧插件 README 已随清理删除。）内容包含：一句话定位（Lux v2：面向英雄联盟新手的独立选人助手，基于 101.qq.com 数据）、当前状态（Phase 1 数据层进行中）、开发命令（`npm run test` / `npm run typecheck` / `npm run sync`）、设计与计划文档入口（`docs/superpowers/`）。
+（旧插件 README 已随清理删除。）内容包含：一句话定位（Lux v2：面向英雄联盟新手的独立选人助手，基于 101.qq.com 数据）、当前状态（Phase 1 数据层进行中）、开发命令（`npm run test` / `npm run typecheck` / `npm run sync`）、设计与计划文档入口（`docs/plans/`、`docs/specs/`）。
 
 - [ ] **Step 8: 验证**
 

@@ -1,6 +1,5 @@
 # Lux v2 Phase 3B（Electron 壳 + 置顶小窗 UI + 打包）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把已完成的引擎与 LCU 核心组装成可交付产品：Electron 独立应用（置顶小窗四状态 + 托盘 + 设置页 + 首启引导），产出双击即装的 Windows NSIS 安装包 `Lux-Setup-0.3.0.exe`。
 

@@ -1,6 +1,5 @@
 # Lux v2 Phase 3A（LCU 集成核心）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 交付与游戏客户端（LCU）对接的完整核心：发现/连接/重连、选人会话与事件订阅、英雄元数据（名称/定位/伤害类型/难度）读取、会话→引擎上下文映射、符文页与召唤师技能写入，并以 Mock LCU + dev CLI 全链路离线验收。
 

@@ -2,7 +2,6 @@
 
 > **Status (2026-10-08):** Task 1–9 已完成（提交 13a9c9f..945abe9，之后追加 node_modules/dist 取消跟踪提交；49 个单测通过，`npm run build` 通过）。Task 10 游戏内验收待用户执行。
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让选人推荐在国服客户端真正可用：修 LCU 事件处理、换 101.qq.com 国服数据源、英雄元数据运行时从客户端加载、补单测。
 
@@ -10,7 +9,7 @@
 
 **Tech Stack:** TypeScript, React 19, Vite 6, Pengu Loader Runtime, vitest
 
-**Spec:** `docs/superpowers/specs/2026-10-08-lux-phase1-fix-design.md`
+**Spec:** `docs/specs/2026-10-08-lux-phase1-fix-design.md`
 
 **约定：**
 - 位置值域三层：LCU（`middle`/`bottom`）→ 内部（`mid`/`bot`）→ QQ101（`MIDDLE`/`BOTTOM`）。映射只经 `positions.ts`。

@@ -1,6 +1,5 @@
 # Lux v2 Phase 2（符文/技能摄入 + 推荐引擎）Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在 Phase 1 数据层之上交付「摄入扩展 + 推荐引擎」：符文/召唤师技能/大乱斗数据的抓取与解析入库，纯函数推荐引擎（排位/征召/盲选/大乱斗评分 + 一句理由 + 大乱斗换留判定 + 内置大乱斗规则表），并以 CLI 冒烟产物收尾。
 

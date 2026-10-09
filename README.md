@@ -64,11 +64,11 @@ npx tsx scripts/lux-dev-cli.ts --scenario aram --root ./data --apply  # 含符�
 
 ## 文档
 
-- 设计规格：`docs/superpowers/specs/2026-10-08-lux-v2-standalone-design.md`
-- Phase 1 实施计划：`docs/superpowers/plans/2026-10-08-lux-v2-phase1-data-layer-plan.md`
-- Phase 2 实施计划：`docs/superpowers/plans/2026-10-08-lux-v2-phase2-engine-plan.md`
-- Phase 3A 实施计划：`docs/superpowers/plans/2026-10-08-lux-v2-phase3a-lcu-core-plan.md`
-- Phase 3B 实施计划：`docs/superpowers/plans/2026-10-09-lux-v2-phase3b-app-plan.md`
+- 设计规格：`docs/specs/2026-10-08-lux-v2-standalone-design.md`
+- Phase 1 实施计划：`docs/plans/2026-10-08-lux-v2-phase1-data-layer-plan.md`
+- Phase 2 实施计划：`docs/plans/2026-10-08-lux-v2-phase2-engine-plan.md`
+- Phase 3A 实施计划：`docs/plans/2026-10-08-lux-v2-phase3a-lcu-core-plan.md`
+- Phase 3B 实施计划：`docs/plans/2026-10-09-lux-v2-phase3b-app-plan.md`
 - 端点侦察笔记：`shared/qq101/recon-notes.md`
 
 ## 许可

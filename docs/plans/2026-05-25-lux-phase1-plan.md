@@ -1,6 +1,5 @@
 # Lux Phase 1 — 英雄选择智能推荐 实现计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在英雄选择阶段，根据双方已选/Ban 的阵容，通过 OP.GG API + 本地规则给出最优英雄推荐。
 
@@ -124,7 +123,7 @@ cp /tmp/sona-reference/pengu.d.ts pengu.d.ts
 
 - [ ] **Step 4: 安装依赖**
 
-Run: `cd /home/giao1907/Project/.claude/Lux && npm install`
+Run: `cd /home/giao1907/Project/Lux && npm install`
 Expected: 依赖安装成功，无错误。
 
 - [ ] **Step 5: 验证构建**
@@ -135,7 +134,7 @@ Expected: 无错误（此时 src 目录还为空）。
 - [ ] **Step 6: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add package.json tsconfig.json vite.config.ts pengu.d.ts
 git commit -m "feat: project scaffolding for Lux plugin"
 ```
@@ -201,7 +200,7 @@ export type Logger = ReturnType<typeof createLogger>
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/logger.ts
 git commit -m "feat: add logger utility"
 ```
@@ -308,7 +307,7 @@ export interface SummonerInfo {
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/types/lcu.ts
 git commit -m "feat: add LCU type definitions for champ select"
 ```
@@ -396,13 +395,13 @@ main()
 
 - [ ] **Step 3: 运行导入脚本**
 
-Run: `cd /home/giao1907/Project/.claude/Lux && npx tsx scripts/import-champion-meta.ts`
+Run: `cd /home/giao1907/Project/Lux && npx tsx scripts/import-champion-meta.ts`
 Expected: 生成包含全部英雄的 `src/data/champion-meta.json`。
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/data/champion-meta.json scripts/import-champion-meta.ts
 git commit -m "feat: add champion metadata and import script"
 ```
@@ -461,7 +460,7 @@ export function normalizeScore(scores: Map<number, number>): Map<number, number>
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/utils.ts
 git commit -m "feat: add utility functions"
 ```
@@ -521,7 +520,7 @@ export const injector = new InjectorManager()
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/InjectorManager.ts
 git commit -m "feat: add InjectorManager for DOM injection"
 ```
@@ -591,7 +590,7 @@ export const store = new LuxStore()
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/store.ts
 git commit -m "feat: add config store with DataStore persistence"
 ```
@@ -684,7 +683,7 @@ export type { LCUEventMessage, GameflowPhase, ChampSelectSession }
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/lcu.ts
 git commit -m "feat: add minimal LCU Manager for champ select"
 ```
@@ -803,7 +802,7 @@ export type { OpggChampionTier, OpggCounterStats, OpggSynergyStats }
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/opgg-api.ts
 git commit -m "feat: add OP.GG API client with timeout"
 ```
@@ -878,7 +877,7 @@ export function getMetaScore(_championId: number): number {
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/local-rules.ts src/data/local-rules.json
 git commit -m "feat: add local rules fallback for offline mode"
 ```
@@ -1074,7 +1073,7 @@ function classifyScore(score: number): ChampionScore['tier'] {
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/scorer.ts
 git commit -m "feat: add scoring engine for champion recommendation"
 ```
@@ -1276,7 +1275,7 @@ export function stopRecommendation() {
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/lib/features/champion-recommendation.ts
 git commit -m "feat: add champion recommendation feature module"
 ```
@@ -1456,7 +1455,7 @@ function findChampionElement(championId: number): HTMLElement | null {
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/components/ChampionBadgeOverlay.tsx
 git commit -m "feat: add champion badge overlay component"
 ```
@@ -1626,7 +1625,7 @@ function groupByPosition(scores: ChampionScore[], assigned: string) {
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/components/RecommendationPanel.tsx
 git commit -m "feat: add recommendation detail panel component"
 ```
@@ -1899,7 +1898,7 @@ function mountApp() {
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add src/index.tsx src/styles/index.css
 git commit -m "feat: add plugin entry point, injections, and styles"
 ```
@@ -1910,7 +1909,7 @@ git commit -m "feat: add plugin entry point, injections, and styles"
 
 - [ ] **Step 1: 验证 TypeScript 编译**
 
-Run: `cd /home/giao1907/Project/.claude/Lux && npx tsc --noEmit`
+Run: `cd /home/giao1907/Project/Lux && npx tsc --noEmit`
 Expected: 无类型错误。
 
 - [ ] **Step 2: 验证构建产物**
@@ -1938,7 +1937,7 @@ cp dist/index.css <loaderPath>/plugins/lux/
 - [ ] **Step 4: Commit 最终调整**
 
 ```bash
-cd /home/giao1907/Project/.claude/Lux
+cd /home/giao1907/Project/Lux
 git add -A
 git commit -m "chore: final adjustments after integration testing"
 ```

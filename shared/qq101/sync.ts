@@ -8,6 +8,19 @@ import type { Warehouse } from '../warehouse/store'
 
 export const ALL_LANES: Qq101Lane[] = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'SUPPORT']
 
+/** 选择「有数据的最新版本」：101 会先列版本后灌数据；探测最多 maxProbe 个版本（默认 3） */
+export async function resolvePopulatedPatch(
+  client: Qq101Client,
+  maxProbe = 3,
+): Promise<string | null> {
+  const patches = await client.getPatches()
+  for (const patch of patches.slice(0, maxProbe)) {
+    const tier = await client.getTierList(patch, 'ALL')
+    if (tier && tier.champions.length > 0) return patch
+  }
+  return patches[0] ?? null // 全部为空（极端）：回退最新版，交由主同步按失败处理
+}
+
 export type SyncStatus = 'blocked' | 'up-to-date' | 'synced' | 'partial'
 
 export interface SyncResult {

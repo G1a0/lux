@@ -25,6 +25,16 @@ describe('createQq101Client', () => {
     expect(calls).toHaveLength(1)
   })
 
+  it('getPatches 返回完整版本列表并缓存（两次调用只发一次请求）', async () => {
+    const calls: string[] = []
+    const client = createQq101Client({ fetchImpl: okFetch(versionlistFixture, calls), isAllowed: () => true })
+    const patches = await client.getPatches()
+    expect(patches).toContain('16.19')
+    expect(patches[0]).toBe('16.19')
+    expect(await client.getPatches()).toEqual(patches)
+    expect(calls).toHaveLength(1)
+  })
+
   it('getTierList 请求参数包含 lane 与版本', async () => {
     const calls: string[] = []
     const client = createQq101Client({ fetchImpl: okFetch(tierlistFixture, calls), isAllowed: () => true })

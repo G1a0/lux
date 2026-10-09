@@ -10,7 +10,7 @@ import { mapAramInput, mapRiftContext } from '../../shared/lcu/map-session'
 import { recommendRift } from '../../shared/engine/recommend'
 import { judgeAram } from '../../shared/engine/aram'
 import { createQq101Client } from '../../shared/qq101/client'
-import { syncRiftData } from '../../shared/qq101/sync'
+import { resolvePopulatedPatch, syncRiftData } from '../../shared/qq101/sync'
 import { isApiAllowed, nextAllowedTime } from '../../shared/timegate'
 import { createConfigStore, type ConfigStore } from './config'
 import { createCompanionService, type AdviceSource, type CompanionService } from './service'
@@ -91,7 +91,13 @@ export function createAppWithPaths(
         return { status: 'blocked-timegate', patch: null, blockedUntil: nextAllowedTime(now).toISOString() }
       }
       const client = createQq101Client()
-      const result = await syncRiftData({ client, warehouse, onProgress })
+      let patch: string | null = null
+      try {
+        patch = await resolvePopulatedPatch(client)
+      } catch {
+        return { status: 'failed', patch: null }
+      }
+      const result = await syncRiftData({ client, warehouse, onProgress, patchOverride: patch ?? undefined })
       if (result.patch) rebuildDataset() // 同步成功 → 数据仓就绪/更新：重建引擎数据（修复首启竞态）
       return { status: result.status, patch: result.patch }
     },

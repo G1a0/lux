@@ -30,6 +30,7 @@ export class ApiTimeBlockedError extends Error {
 
 export interface Qq101Client {
   getPatch(): Promise<string | null>
+  getPatches(): Promise<string[]>
   getTierList(patch: string, lane: Qq101Lane | 'ALL'): Promise<Qq101TierList | null>
   getMatchups(patch: string, lane: Qq101Lane, championId: number): Promise<Qq101Matchup[] | null>
   getSynergies(patch: string, lane: Qq101Lane, championId: number): Promise<Qq101Synergy[] | null>
@@ -54,6 +55,7 @@ export function createQq101Client(options: CreateQq101ClientOptions = {}): Qq101
   const minIntervalMs = options.minIntervalMs ?? 150
 
   let cachedPatch: string | null = null
+  let cachedPatches: string[] | null = null
   let lastRequestAt = 0
 
   async function guard(): Promise<void> {
@@ -88,13 +90,24 @@ export function createQq101Client(options: CreateQq101ClientOptions = {}): Qq101
     }
   }
 
+  async function loadPatches(): Promise<string[]> {
+    if (cachedPatches) return cachedPatches
+    const versions = await request(versionsUrl(), parseQq101Versions)
+    if (!versions || versions.length === 0) return []
+    cachedPatches = versions
+    return cachedPatches
+  }
+
   return {
     async getPatch(): Promise<string | null> {
       if (cachedPatch) return cachedPatch
-      const versions = await request(versionsUrl(), parseQq101Versions)
-      if (!versions || versions.length === 0) return null
-      cachedPatch = versions[0]
+      const patches = await loadPatches()
+      if (patches.length === 0) return null
+      cachedPatch = patches[0]
       return cachedPatch
+    },
+    async getPatches(): Promise<string[]> {
+      return loadPatches()
     },
     getTierList: (patch, lane) =>
       request(

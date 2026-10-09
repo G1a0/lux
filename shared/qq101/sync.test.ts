@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ApiTimeBlockedError, type Qq101Client } from './client'
-import { syncRiftData } from './sync'
+import { resolvePopulatedPatch, syncRiftData } from './sync'
 import type { Qq101AramHero, Qq101Matchup, Qq101RunePage, Qq101SpellCombo, Qq101Synergy, Qq101TierList } from './types'
 import { createWarehouse, type Warehouse } from '../warehouse/store'
 import type { Qq101Lane } from '../positions'
@@ -40,6 +40,7 @@ function createFakeClient(opts: {
   let remaining = opts.blockAfter ?? Infinity
   const client: Qq101Client = {
     async getPatch() { calls.push({ kind: 'patch', lane: null }); return '16.19' },
+    async getPatches() { return ['16.19'] },
     async getTierList(_patch, lane) {
       calls.push({ kind: 'tier', lane })
       if (opts.emptyTier) return { date: '', champions: [] }
@@ -229,5 +230,48 @@ describe('syncRiftData', () => {
     expect(result.patch).toBe('16.88')
     expect(wh.hasTier('16.88', 'MIDDLE')).toBe(true)
     expect(wh.readManifest()?.patch).toBe('16.88')
+  })
+})
+
+describe('resolvePopulatedPatch', () => {
+  // 专用小型假客户端：记录 ALL 榜探测顺序，populated[patch] 非空视为该版本有数据
+  function probeClient(
+    patches: string[],
+    populated: Record<string, number[]>,
+  ): { client: Qq101Client; probes: string[] } {
+    const probes: string[] = []
+    const client: Qq101Client = {
+      async getPatch() { return patches[0] ?? null },
+      async getPatches() { return patches },
+      async getTierList(patch, lane) {
+        probes.push(`${patch}:${lane}`)
+        const ids = populated[patch] ?? []
+        return ids.length > 0 ? fakeTier(ids) : { date: '', champions: [] }
+      },
+      async getMatchups() { return null },
+      async getSynergies() { return null },
+      async getRunePages() { return null },
+      async getSpellCombos() { return null },
+      async getAramOverview() { return null },
+    }
+    return { client, probes }
+  }
+
+  it('最新版为空 → 回退到有数据的上一版', async () => {
+    const { client, probes } = probeClient(['16.20', '16.19'], { '16.19': CHAMPS })
+    expect(await resolvePopulatedPatch(client)).toBe('16.19')
+    expect(probes).toEqual(['16.20:ALL', '16.19:ALL'])
+  })
+
+  it('最新版有数据 → 直接返回，只探测一次', async () => {
+    const { client, probes } = probeClient(['16.20', '16.19'], { '16.20': CHAMPS, '16.19': CHAMPS })
+    expect(await resolvePopulatedPatch(client)).toBe('16.20')
+    expect(probes).toEqual(['16.20:ALL'])
+  })
+
+  it('全部为空 → 回退最新版（交由主同步按失败处理）', async () => {
+    const { client, probes } = probeClient(['16.20', '16.19'], {})
+    expect(await resolvePopulatedPatch(client)).toBe('16.20')
+    expect(probes).toEqual(['16.20:ALL', '16.19:ALL'])
   })
 })

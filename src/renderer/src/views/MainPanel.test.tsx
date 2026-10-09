@@ -22,6 +22,32 @@ afterEach(() => {
   delete (window as { lux?: unknown }).lux
 })
 
+/** 等待态 LcuInfo 基线（按需覆盖字段） */
+function waitingInfo(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    status: 'waiting', lockDir: null, port: null, lastError: null,
+    targetDir: null, targetProbe: null, processNote: null, ...overrides,
+  }
+}
+
+/** LcuDirProbe 基线（按需覆盖字段） */
+function dirProbe(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    dir: 'D:\\X\\LeagueClient', dirExists: true, lockfileExists: true,
+    lockfileSize: 64, lockfileMtimeMs: 1700000000000, processName: null, contentIssue: null, parsed: true, ...overrides,
+  }
+}
+
+function renderWithLcuInfo(info: Record<string, unknown>): void {
+  ;(window as unknown as { lux: unknown }).lux = {
+    onLcuInfo: (cb: (info: unknown) => void) => {
+      cb(info)
+      return () => {}
+    },
+  }
+  render(<MainPanel snapshot={null} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+}
+
 describe('MainPanel', () => {
   it('渲染主推、理由、符文与技能的展示名', () => {
     render(<MainPanel snapshot={snap} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
@@ -32,29 +58,55 @@ describe('MainPanel', () => {
   })
 
   it('无快照时展示 LCU 连接诊断（未发现文案 + 路径提示 + 最近错误）', async () => {
-    ;(window as unknown as { lux: unknown }).lux = {
-      onLcuInfo: (cb: (info: unknown) => void) => {
-        cb({ status: 'waiting', lockDir: null, port: null, lastError: 'connect ECONNREFUSED 127.0.0.1:54321', targetDir: null })
-        return () => {}
-      },
-    }
-    render(<MainPanel snapshot={null} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+    renderWithLcuInfo(waitingInfo({ lastError: 'connect ECONNREFUSED 127.0.0.1:54321' }))
     expect(await screen.findByText(/未发现游戏客户端/)).toBeTruthy()
     expect(await screen.findByText(/已尝试的常见路径均未命中/)).toBeTruthy()
     expect(await screen.findByText(/connect ECONNREFUSED 127\.0\.0\.1:54321/)).toBeTruthy()
   })
 
-  it('指定了目录但未命中时展示指定目录与排查提示（替代通用未命中文案）', async () => {
-    ;(window as unknown as { lux: unknown }).lux = {
-      onLcuInfo: (cb: (info: unknown) => void) => {
-        cb({ status: 'waiting', lockDir: null, port: null, lastError: null, targetDir: 'D:\\X\\LeagueClient' })
-        return () => {}
-      },
-    }
-    render(<MainPanel snapshot={null} onExpand={vi.fn()} onCollapse={vi.fn()} onSettings={vi.fn()} />)
+  it('指定了目录但探测详情缺失时展示指定目录与通用排查提示（兼容旧数据）', async () => {
+    renderWithLcuInfo(waitingInfo({ targetDir: 'D:\\X\\LeagueClient' }))
     expect(await screen.findByText(/指定目录：D:\\X\\LeagueClient/)).toBeTruthy()
     expect(await screen.findByText(/未在该目录找到 lockfile/)).toBeTruthy()
     expect(screen.queryByText(/已尝试的常见路径均未命中/)).toBeNull()
+  })
+
+  it('指定目录不存在时提示检查路径拼写', async () => {
+    renderWithLcuInfo(waitingInfo({
+      targetDir: 'D:\\X\\LeagueClient',
+      targetProbe: dirProbe({ dirExists: false, lockfileExists: false, lockfileSize: null, lockfileMtimeMs: null, parsed: false }),
+    }))
+    expect(await screen.findByText(/该目录不存在——请检查路径拼写/)).toBeTruthy()
+  })
+
+  it('目录存在但无 lockfile 时提示路径层级与客户端运行', async () => {
+    renderWithLcuInfo(waitingInfo({
+      targetDir: 'D:\\X\\LeagueClient',
+      targetProbe: dirProbe({ lockfileExists: false, lockfileSize: null, lockfileMtimeMs: null, parsed: false }),
+    }))
+    expect(await screen.findByText(/目录存在，但没有 lockfile 文件/)).toBeTruthy()
+  })
+
+  it('lockfile 属于 Riot Client（启动器）时提示改选 LeagueClient 文件夹', async () => {
+    renderWithLcuInfo(waitingInfo({
+      targetDir: 'C:\\Riot Client Data\\User Data\\Config',
+      targetProbe: dirProbe({ dir: 'C:\\Riot Client Data\\User Data\\Config', contentIssue: 'foreign', processName: 'Riot Client', parsed: false }),
+    }))
+    expect(await screen.findByText(/这里的 lockfile 属于 Riot Client，不是游戏客户端——请改选 LeagueClient 文件夹/)).toBeTruthy()
+  })
+
+  it('lockfile 为空（0 字节）时展示最后修改时间', async () => {
+    const mtimeMs = new Date(2026, 0, 5, 9, 8).getTime()
+    renderWithLcuInfo(waitingInfo({
+      targetDir: 'D:\\X\\LeagueClient',
+      targetProbe: dirProbe({ lockfileSize: 0, lockfileMtimeMs: mtimeMs, contentIssue: 'empty', parsed: false }),
+    }))
+    expect(await screen.findByText(/lockfile 是空的（0 字节，最后修改 2026\/01\/05 09:08）——客户端可能没在运行/)).toBeTruthy()
+  })
+
+  it('展示进程探测摘要（自动探测行；waiting 且有 processNote 时）', async () => {
+    renderWithLcuInfo(waitingInfo({ processNote: '未发现正在运行的 LeagueClientUx / LeagueClient 进程' }))
+    expect(await screen.findByText(/自动探测：未发现正在运行的 LeagueClientUx \/ LeagueClient 进程/)).toBeTruthy()
   })
 
   it('一键应用按钮调用桥', async () => {

@@ -1,6 +1,6 @@
 // 编排：发现 lockfile → 连接（REST+WSS）→ 会话存在时防抖重算 → 回调建议；
 // 客户端消失/断线 → 退避重连、静默等待，不打扰用户。
-import { discoverLockfile, normalizeLcuDir } from './lockfile'
+import { discoverLockfile, getLastProcessProbeInfo, normalizeLcuDir, probeLcuDir, type LcuDirProbe } from './lockfile'
 import { createLcuHttp, type LcuHttp } from './http'
 import { createLcuEventSocket, type LcuEventSocket } from './events'
 import { createLcuReaders, type LcuReaders } from './readers'
@@ -37,8 +37,17 @@ export interface LcuAdvisor {
   setLcuDirForTest(dir: string): void
   http(): LcuHttp | null
   readers(): LcuReaders | null
-  /** 连接诊断（UI 展示用）：当前状态、命中目录/端口、最近一次请求错误、当前指定目录（正在探测的目标，自动发现时为 null） */
-  info(): { status: AdvisorStatus; lockDir: string | null; port: number | null; lastError: string | null; targetDir: string | null }
+  /** 连接诊断（UI 展示用）：当前状态、命中目录/端口、最近一次请求错误、当前指定目录（正在探测的目标，自动发现时为 null）；
+   *  targetProbe：等待态且指定了目录时该目录的 lockfile 探测详情（排障）；processNote：最近一次进程探测摘要（脱敏）。 */
+  info(): {
+    status: AdvisorStatus
+    lockDir: string | null
+    port: number | null
+    lastError: string | null
+    targetDir: string | null
+    targetProbe: LcuDirProbe | null
+    processNote: string | null
+  }
 }
 
 export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
@@ -207,6 +216,15 @@ export function createLcuAdvisor(options: LcuAdvisorOptions): LcuAdvisor {
     },
     http: () => http,
     readers: () => readers,
-    info: () => ({ status, lockDir: info?.lockDir ?? null, port: info?.port ?? null, lastError, targetDir }),
+    info: () => ({
+      status,
+      lockDir: info?.lockDir ?? null,
+      port: info?.port ?? null,
+      lastError,
+      targetDir,
+      // 等待态才探测：连接成功后目录内容如何已无诊断价值，且每次 info() 都做同步 IO
+      targetProbe: status === 'waiting' && targetDir ? probeLcuDir(targetDir) : null,
+      processNote: getLastProcessProbeInfo()?.note ?? null,
+    }),
   }
 }

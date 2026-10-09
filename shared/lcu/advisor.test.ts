@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createMockLcu, type MockLcu } from './mock/server'
@@ -163,6 +164,28 @@ describe('LcuAdvisor', () => {
     }
     expect(advisor.info().lockDir).toBeNull() // 断开后路径信息清空
     expect(advisor.info().status).toBe('waiting')
+  })
+
+  it('waiting 且指定目录时 info() 给出目录探测详情（targetProbe）；非 win32 进程探测不触发（processNote null）', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lux-lcu-probe-'))
+    const advisor = createLcuAdvisor({
+      lcuDirOverride: dir,
+      discoverIntervalMs: 50,
+      debounceMs: 30,
+      compute: session => ({ kind: 'rift', sessionQueueId: session.queueId }),
+    })
+    try {
+      advisor.start()
+      await new Promise(r => setTimeout(r, 100))
+      const info = advisor.info()
+      expect(info.status).toBe('waiting')
+      expect(info.targetDir).toBe(dir)
+      expect(info.targetProbe).toMatchObject({ dir, dirExists: true, lockfileExists: false, parsed: false })
+      expect(info.processNote).toBeNull() // 测试跑在 Linux：进程探测仅 win32 触发
+    } finally {
+      advisor.stop()
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('compute 可返回 Promise（异步预取场景）', async () => {

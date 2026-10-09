@@ -28,6 +28,27 @@ function nameOf(id: number, snap: UiSnapshot | null): string {
   return names?.[id] ?? `英雄${id}`
 }
 
+/** 手工 pad：测试要确定性输出，不用 toLocaleString */
+function formatMtime(ms: number): string {
+  const d = new Date(ms)
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+/** 等待态且指定了目录时，根据目录探测详情给出针对性的排查提示 */
+function targetDirHint(probe: LcuInfo['targetProbe']): string {
+  if (!probe) return '（未在该目录找到 lockfile——请确认这个文件夹内「直接」有一个名为 lockfile 的文件，而不是再深一层）'
+  if (!probe.dirExists) return '（该目录不存在——请检查路径拼写）'
+  if (!probe.lockfileExists) return '（目录存在，但没有 lockfile 文件——请确认路径层级，并确认客户端正在运行）'
+  if (probe.contentIssue === 'foreign') return `（这里的 lockfile 属于 ${probe.processName ?? '启动器'}，不是游戏客户端——请改选 LeagueClient 文件夹）`
+  if (probe.contentIssue === 'empty') {
+    const mtime = probe.lockfileMtimeMs !== null ? formatMtime(probe.lockfileMtimeMs) : '未知'
+    return `（lockfile 是空的（0 字节，最后修改 ${mtime}）——客户端可能没在运行）`
+  }
+  if (probe.contentIssue === 'invalid') return '（lockfile 内容无法解析——请截图反馈）'
+  return '（已找到 lockfile，连接中…）'
+}
+
 export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPanelProps): React.JSX.Element {
   const bridge = getBridge()
   const [applyMsg, setApplyMsg] = useState<string | null>(null)
@@ -63,9 +84,12 @@ export function MainPanel({ snapshot, onExpand, onCollapse, onSettings }: MainPa
               <div className="dim">若长时间未发现，可在设置中手动指定客户端目录。</div>
             )}
             {lcuInfo.status === 'waiting' && lcuInfo.targetDir ? (
-              <div className="dim">指定目录：{lcuInfo.targetDir}（未在该目录找到 lockfile——请确认这个文件夹内「直接」有一个名为 lockfile 的文件，而不是再深一层）</div>
+              <div className="dim">指定目录：{lcuInfo.targetDir}{targetDirHint(lcuInfo.targetProbe)}</div>
             ) : (
               <div className="dim">客户端目录：{lcuInfo.lockDir ?? '已尝试的常见路径均未命中'}</div>
+            )}
+            {lcuInfo.status === 'waiting' && lcuInfo.processNote && (
+              <div className="dim">自动探测：{lcuInfo.processNote}</div>
             )}
             <div className="dim">端口：{lcuInfo.port ?? '未知'}</div>
             {lcuInfo.lastError && <div className="dim">{lcuInfo.lastError.slice(0, 120)}</div>}

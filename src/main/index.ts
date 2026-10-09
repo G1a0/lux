@@ -68,8 +68,8 @@ app.whenReady().then(async () => {
   const win = createWindow()
   if (!UI_MOCK) {
     bundle = createApp()
+    wireIpc(win) // 先接 IPC，再启动服务：避免启动早期事件因监听未就位而丢失
     bundle.service.start()
-    wireIpc(win)
   }
   if (screenshotArgIdx >= 0) {
     const dir = process.argv[screenshotArgIdx + 1] ?? 'screenshots'

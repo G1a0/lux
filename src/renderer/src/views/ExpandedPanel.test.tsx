@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen, fireEvent } from '@testing-library/react'
 import { ExpandedPanel } from './ExpandedPanel'
 import type { UiSnapshot } from '../bridge'
 
@@ -27,14 +27,21 @@ afterEach(() => {
 
 describe('ExpandedPanel', () => {
   it('渲染备选两名与主推摘要', () => {
-    render(<ExpandedPanel snapshot={snap} />)
+    render(<ExpandedPanel snapshot={snap} onBack={vi.fn()} />)
     expect(screen.getByText('阿卡丽')).toBeTruthy()
     expect(screen.getByText('玛尔扎哈')).toBeTruthy()
     expect(screen.getByText(/主推：薇克丝/)).toBeTruthy()
   })
 
+  it('点击返回按钮回调 onBack', () => {
+    const onBack = vi.fn()
+    render(<ExpandedPanel snapshot={snap} onBack={onBack} />)
+    fireEvent.click(screen.getByTitle('返回'))
+    expect(onBack).toHaveBeenCalled()
+  })
+
   it('非排位快照时降级为占位而不崩溃', () => {
-    render(<ExpandedPanel snapshot={{ kind: 'none' }} />)
+    render(<ExpandedPanel snapshot={{ kind: 'none' }} onBack={vi.fn()} />)
     expect(screen.getByText('…')).toBeTruthy()
   })
 })

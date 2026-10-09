@@ -2,13 +2,17 @@ import type { UiSnapshot } from '../bridge'
 
 export interface ExpandedPanelProps {
   snapshot: UiSnapshot
+  onBack(): void
 }
 
-export function ExpandedPanel({ snapshot }: ExpandedPanelProps): React.JSX.Element {
+export function ExpandedPanel({ snapshot, onBack }: ExpandedPanelProps): React.JSX.Element {
   if (snapshot.kind !== 'rift') return <div className="panel">…</div>
   return (
     <div className="panel drag-region">
-      <div className="panel-title no-drag"><span>候选详情</span></div>
+      <div className="panel-title no-drag">
+        <span>候选详情</span>
+        <span className="panel-actions"><button onClick={onBack} title="返回">‹</button></span>
+      </div>
       <ul className="alt-list">
         {snapshot.advice.alternates.map(alt => (
           <li key={alt.championId}>

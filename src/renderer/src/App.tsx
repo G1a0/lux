@@ -90,7 +90,16 @@ export function App(): React.JSX.Element {
       />
     )
   }
-  if (view === 'expanded' && snapshot) return <ExpandedPanel snapshot={snapshot} />
+  if (view === 'expanded' && snapshot) {
+    return (
+      <ExpandedPanel
+        snapshot={snapshot}
+        onBack={() => {
+          setView('main')
+        }}
+      />
+    )
+  }
   return (
     <MainPanel
       snapshot={snapshot}

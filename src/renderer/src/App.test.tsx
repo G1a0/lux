@@ -1,29 +1,36 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from 'vitest'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import { App } from './App'
+import { createInertBridge, type UiBridge } from './bridge'
+
+function installBridge(overrides: Partial<UiBridge> = {}): void {
+  delete (window as { lux?: unknown }).lux
+  ;(window as unknown as { lux: unknown }).lux = {
+    ...createInertBridge(),
+    getConfig: async () => ({ onboarded: true }),
+    ...overrides,
+  }
+}
+
+beforeEach(() => {
+  installBridge()
+})
 
 afterEach(() => {
   cleanup()
   delete (window as { lux?: unknown }).lux
 })
 
-describe('App（mock 视图占位）', () => {
-  it('初始渲染显示启动占位', () => {
+describe('App 路由', () => {
+  it('无快照时显示等待文案', async () => {
     render(<App />)
-    expect(screen.getByText('Lux 启动中…')).toBeTruthy()
+    expect(await screen.findByText('等待进入选人…')).toBeTruthy()
   })
 
-  it('window.lux.onView 推送后渲染视图与快照', () => {
-    let handler: ((view: string, snap: unknown) => void) | undefined
-    ;(window as unknown as { lux: unknown }).lux = {
-      onView: (cb: (view: string, snap: unknown) => void) => {
-        handler = cb
-        return () => {}
-      },
-    }
+  it('未完成引导时进入引导视图', async () => {
+    installBridge({ getConfig: async () => ({ onboarded: false }) })
     render(<App />)
-    act(() => handler?.('main', { kind: 'rift' }))
-    expect(screen.getByText('[mock] view=main')).toBeTruthy()
+    expect(await screen.findByText('首启引导（待实现）')).toBeTruthy()
   })
 })

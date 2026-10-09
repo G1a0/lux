@@ -1,0 +1,21 @@
+:root {
+  --bg-deep: #0a1428;
+  --bg-panel: #0f1b30;
+  --border-gold: #785a28;
+  --gold: #c8aa6e;
+  --gold-bright: #f0e6d2;
+  --text: #e8e3d5;
+  --text-dim: #a09b8c;
+  --green: #3fd18a;
+  --red: #e05a5a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: transparent;
+  font-family: 'Microsoft YaHei', 'PingFang SC', system-ui, sans-serif;
+  color: var(--text);
+  -webkit-user-select: none;
+  user-select: none;
+}
+#root { width: 100vw; height: 100vh; overflow: hidden; }
+.placeholder { display: grid; place-items: center; height: 100%; background: var(--bg-deep); color: var(--text-dim); }

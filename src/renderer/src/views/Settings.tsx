@@ -9,11 +9,12 @@ interface Cfg {
   ownedFilter: boolean
   modes: { rift: boolean; aram: boolean }
   onboarded: boolean
+  flashKey?: 'd' | 'f'
   lcuDir?: string
 }
 
 // mock 窗口（LUX_UI_MOCK）无 IPC handler，getConfig 会 reject；降级为默认配置而非卡在加载中
-const FALLBACK_CFG: Cfg = { ownedFilter: false, modes: { rift: true, aram: true }, onboarded: true }
+const FALLBACK_CFG: Cfg = { ownedFilter: false, modes: { rift: true, aram: true }, onboarded: true, flashKey: 'f' }
 
 export function Settings({ onClose }: SettingsProps): React.JSX.Element {
   const bridge = getBridge()
@@ -67,6 +68,23 @@ export function Settings({ onClose }: SettingsProps): React.JSX.Element {
         <input type="checkbox" checked={cfg.modes.aram} onChange={e => void patch({ modes: { ...cfg.modes, aram: e.target.checked } })} />
         启用大乱斗换/留判定
       </label>
+      <div className="cfg-row no-drag">
+        <span>闪现位置</span>
+        <button
+          className="cfg-toggle"
+          aria-pressed={(cfg.flashKey ?? 'f') === 'd'}
+          onClick={() => void patch({ flashKey: 'd' })}
+        >
+          D 闪
+        </button>
+        <button
+          className="cfg-toggle"
+          aria-pressed={(cfg.flashKey ?? 'f') === 'f'}
+          onClick={() => void patch({ flashKey: 'f' })}
+        >
+          F 闪
+        </button>
+      </div>
       <div className="cfg-section">
         <div className="dim">游戏客户端目录（自动发现失败时手动指定；保存后几秒内自动生效）</div>
         <div className="cfg-row no-drag">

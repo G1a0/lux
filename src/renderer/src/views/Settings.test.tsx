@@ -44,6 +44,26 @@ describe('Settings', () => {
     await waitFor(() => expect(input.value).toBe(dir))
   })
 
+  it('闪现位置：回显已保存的 D/F 选择并点击写入', async () => {
+    const setConfig = vi.fn(async (p: Record<string, unknown>) => ({
+      ownedFilter: true, modes: { rift: true, aram: true }, onboarded: true, flashKey: 'd', ...p,
+    }))
+    ;(window as unknown as { lux: unknown }).lux = {
+      ...createInertBridge(),
+      getConfig: async () => ({ ownedFilter: true, modes: { rift: true, aram: true }, onboarded: true, flashKey: 'd' }),
+      setConfig,
+      getManifest: async () => null,
+    }
+    render(<Settings onClose={vi.fn()} />)
+    const d = (await screen.findByText('D 闪')) as HTMLButtonElement
+    const f = screen.getByText('F 闪') as HTMLButtonElement
+    await waitFor(() => expect(d.getAttribute('aria-pressed')).toBe('true')) // 回显：已保存 'd'
+    expect(f.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(f)
+    await waitFor(() => expect(setConfig).toHaveBeenCalledWith({ flashKey: 'f' }))
+    await waitFor(() => expect(f.getAttribute('aria-pressed')).toBe('true')) // 写值成功后的选中态
+  })
+
   it('浏览…通过文件夹选择器写入目录并保存', async () => {
     const picked = 'E:\\Lol\\LeagueClient'
     // 真实 set-config 返回合并后的完整配置；mock 同样返回全量，避免部分配置导致渲染崩溃

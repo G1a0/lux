@@ -17,6 +17,7 @@ describe('configStore', () => {
       modes: { rift: true, aram: true },
       onboarded: false,
       windowPos: null,
+      flashKey: 'f',
     })
 
     store.set({ onboarded: true, windowPos: { x: 100, y: 200 } })
@@ -31,6 +32,18 @@ describe('configStore', () => {
     const file = join(dir, 'config.json')
     writeFileSync(file, 'not-json')
     expect(createConfigStore(dir).get().ownedFilter).toBe(true)
+  })
+
+  it("flashKey 默认 'f'，可设为 'd' 并持久化", () => {
+    const store = createConfigStore(dir)
+    expect(store.get().flashKey).toBe('f')
+    expect(store.set({ flashKey: 'd' }).flashKey).toBe('d')
+    expect(createConfigStore(dir).get().flashKey).toBe('d')
+  })
+
+  it("旧配置文件缺 flashKey 时回落 'f'", () => {
+    writeFileSync(join(dir, 'config.json'), JSON.stringify({ ownedFilter: false }))
+    expect(createConfigStore(dir).get().flashKey).toBe('f')
   })
 
   it('set 为浅合并（modes 子对象合并）', () => {

@@ -18,6 +18,16 @@ const MODE_LABELS: Record<number, string> = {
   450: '大乱斗',
 }
 
+/** 闪现（id 4）按设置归一到所选键位：'d' → 第 1 位、'f' → 第 2 位；已在该位或不含闪现则原样 */
+function orderSpells(spellIds: [number, number], flashKey: 'd' | 'f'): [number, number] {
+  const idx = spellIds.indexOf(4)
+  if (idx < 0) return spellIds
+  const target = flashKey === 'd' ? 0 : 1
+  if (idx === target) return spellIds
+  const other = spellIds[1 - idx] // 两个槽位：另一个（非闪现）技能
+  return target === 0 ? [4, other] : [other, 4]
+}
+
 export interface AdviceSource {
   start(): void
   stop(): void
@@ -173,7 +183,13 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
           return emit({
             kind: 'aram',
             queueId: session.queueId,
-            aram,
+            // 仅快照展示与后续 apply 的顺序跟随闪现键位设置；引擎内部结果不改写
+            aram: {
+              ...aram,
+              spells: aram.spells
+                ? { ...aram.spells, spellIds: orderSpells(aram.spells.spellIds, config.flashKey) }
+                : null,
+            },
             names: namesFor([
               aram.current.championId,
               ...(aram.swapTo ? [aram.swapTo.championId] : []),
@@ -192,7 +208,13 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
         emit({
           kind: 'rift',
           queueId: session.queueId,
-          advice,
+          // 仅快照展示与后续 apply 的顺序跟随闪现键位设置；引擎内部结果不改写
+          advice: {
+            ...advice,
+            spells: advice.spells
+              ? { ...advice.spells, spellIds: orderSpells(advice.spells.spellIds, config.flashKey) }
+              : null,
+          },
           names: namesFor([advice.primary.championId, ...advice.alternates.map(a => a.championId)]),
         })
       } catch (error) {
@@ -261,8 +283,11 @@ export function createCompanionService(deps: ServiceDeps): CompanionService {
     getConfig: () => deps.config.get(),
     setConfig(patch) {
       const next = deps.config.set(patch)
-      // 开关切换需即时反映：清 key 后按最近一次会话重算并重发快照
-      if (lastSession && (patch.modes !== undefined || patch.ownedFilter !== undefined)) {
+      // 开关/键位切换需即时反映：清 key 后按最近一次会话重算并重发快照
+      if (
+        lastSession &&
+        (patch.modes !== undefined || patch.ownedFilter !== undefined || patch.flashKey !== undefined)
+      ) {
         lastKey = ''
         service.handleSession(lastSession)
       }

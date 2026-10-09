@@ -8,6 +8,8 @@ export interface AppConfig {
   modes: { rift: boolean; aram: boolean }
   onboarded: boolean
   windowPos: { x: number; y: number } | null
+  /** 闪现键位：'d' = 第 1 槽（spell1）、'f' = 第 2 槽（spell2）；快照/携带时归一含闪现的组合 */
+  flashKey: 'd' | 'f'
   /** 手动指定的客户端目录；缺省 = 自动发现 */
   lcuDir?: string
 }
@@ -17,6 +19,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   modes: { rift: true, aram: true },
   onboarded: false,
   windowPos: null,
+  flashKey: 'f',
 }
 
 export interface ConfigStore {

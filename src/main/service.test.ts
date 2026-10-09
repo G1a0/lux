@@ -98,13 +98,14 @@ function makeService(
     computeAram?: unknown
     championName?: (id: number) => string | null
     http?: LcuHttp | null
+    config?: Partial<AppConfig>
   } = {},
 ) {
   const events: unknown[] = []
   const source = fakeSource(overrides.http ?? null)
   const service = createCompanionService({
     source,
-    config: fakeConfig(),
+    config: fakeConfig(overrides.config),
     championName: overrides.championName,
     computeRift: () =>
       (overrides.computeRift ?? {
@@ -397,6 +398,76 @@ describe('CompanionService', () => {
     expect((events[events.length - 1] as { kind: string }).kind).toBe('rift')
     service.stop()
     expect(source.stopSpy).toHaveBeenCalled()
+  })
+})
+
+describe('flashKey（闪现键位归一）', () => {
+  const riftAdvice = (spellIds: [number, number]): RiftAdvice => ({
+    primary: { championId: 1, reason: 'x', score: 50, factors: [], dominantFactor: null, partialData: false },
+    alternates: [],
+    runes: null,
+    spells: { spellIds, source: 'qq101' },
+    ruleMode: false,
+  })
+  const aramResult = (spellIds: [number, number]): AramJudgeResult => ({
+    action: 'keep',
+    reason: 'y',
+    current: { championId: 1, score: 50, reason: '', factors: [], dominantFactor: null, partialData: false },
+    bench: [],
+    swapTo: null,
+    runes: null,
+    spells: { spellIds, source: 'builtin' },
+  })
+  const riftSpellIds = (snap: unknown): number[] =>
+    (snap as { advice: { spells: { spellIds: number[] } } }).advice.spells.spellIds
+  const aramSpellIds = (snap: unknown): number[] =>
+    (snap as { aram: { spells: { spellIds: number[] } } }).aram.spells.spellIds
+
+  it("flashKey 'd'：rift 快照把闪现归一到第 1 位（引擎原对象不被改写）", () => {
+    const engine = riftAdvice([14, 4]) // 引擎惯例：点燃 + 闪现（闪过第 2 位）
+    const { service, events } = makeService({ config: { flashKey: 'd' }, computeRift: engine })
+    service.handleSession(SESSION_RIFT)
+    expect(riftSpellIds(events[0])).toEqual([4, 14])
+    expect(engine.spells!.spellIds).toEqual([14, 4]) // 只改快照，不改引擎内部
+  })
+
+  it("缺省（'f'）：rift 快照闪现保持第 2 位（维持现状）", () => {
+    const { service, events } = makeService({ computeRift: riftAdvice([14, 4]) })
+    service.handleSession(SESSION_RIFT)
+    expect(riftSpellIds(events[0])).toEqual([14, 4])
+  })
+
+  it("flashKey 'd'：aram 快照同样归一（闪现到第 1 位）", () => {
+    const { service, events } = makeService({ config: { flashKey: 'd' }, computeAram: aramResult([32, 4]) })
+    service.handleSession(SESSION_ARAM)
+    expect((events[0] as { kind: string }).kind).toBe('aram')
+    expect(aramSpellIds(events[0])).toEqual([4, 32])
+  })
+
+  it("不含闪现的组合不受影响（'d' 也不动）", () => {
+    const { service, events } = makeService({ config: { flashKey: 'd' }, computeRift: riftAdvice([1, 7]) })
+    service.handleSession(SESSION_RIFT)
+    expect(riftSpellIds(events[0])).toEqual([1, 7])
+  })
+
+  it('切换闪现键位立即重发快照（无需等下次会话变化）', () => {
+    const { service, events } = makeService({ computeRift: riftAdvice([14, 4]) })
+    service.handleSession(SESSION_RIFT)
+    service.setConfig({ flashKey: 'd' })
+    expect(events).toHaveLength(2)
+    expect(riftSpellIds(events[1])).toEqual([4, 14])
+  })
+
+  it('applySpells 跟随快照顺序写入（携带技能按所选键位）', async () => {
+    const patch = vi.fn(async () => null)
+    const { service } = makeService({
+      config: { flashKey: 'd' },
+      computeRift: riftAdvice([14, 4]),
+      http: fakeHttp({ patch }),
+    })
+    service.handleSession(SESSION_RIFT)
+    expect(await service.applySpells()).toBe(true)
+    expect(patch).toHaveBeenCalledWith('/lol-champ-select/v1/session/my-selection', { spell1Id: 4, spell2Id: 14 })
   })
 })
 

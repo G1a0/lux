@@ -31,6 +31,6 @@ describe('App 路由', () => {
   it('未完成引导时进入引导视图', async () => {
     installBridge({ getConfig: async () => ({ onboarded: false }) })
     render(<App />)
-    expect(await screen.findByText('首启引导（待实现）')).toBeTruthy()
+    expect(await screen.findByText('欢迎使用 Lux')).toBeTruthy()
   })
 })

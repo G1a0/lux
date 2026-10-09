@@ -46,3 +46,5 @@ body {
 .cfg-section { border-top: 1px solid #1e2a3f; padding-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
 .cfg-section button { background: none; border: 1px solid var(--border-gold); color: var(--gold); border-radius: 4px; padding: 4px 8px; cursor: pointer; align-self: flex-start; }
 .about { line-height: 1.5; }
+.onboarding-body { display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: var(--text); line-height: 1.6; }
+.onboarding button { margin-top: auto; background: linear-gradient(180deg, #1e3a5f, #16283f); color: var(--gold-bright); border: 1px solid var(--border-gold); border-radius: 4px; padding: 8px 0; cursor: pointer; }
